@@ -1,0 +1,16 @@
+[package]
+name = "enimate"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytemuck = "1.14.0"
+eframe = { version = "0.24.1", features = ["wgpu"] }
+egui = "0.24.1"
+line_drawing = "1.0.0"
+rand = "0.8.5"
+rand_distr = "0.4.3"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
