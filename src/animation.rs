@@ -1,12 +1,13 @@
-use crate::world::World;
+use crate::animation_ui::AnimationUI;
+use crate::{object::Transform, world::World};
 
-pub trait Animation {
+pub trait Animation: AnimationUI {
     // Time is an f32 between 0 and 1.
     fn animate(&self, world: &mut World, time: f32);
 }
 
 pub struct Sequence {
-    animations: Vec<Box<dyn Animation>>,
+    pub animations: Vec<Box<dyn Animation>>,
 }
 
 impl Animation for Sequence {
@@ -20,8 +21,20 @@ impl Animation for Sequence {
     }
 }
 
+pub struct Noop;
+
+impl Animation for Noop {
+    fn animate(&self, _world: &mut World, _time: f32) {}
+}
+
 pub struct Parallel {
-    animations: Vec<Box<dyn Animation>>,
+    pub animations: Vec<Box<dyn Animation>>,
+}
+
+impl Parallel {
+    pub fn new(animations: Vec<Box<dyn Animation>>) -> Self {
+        Self { animations }
+    }
 }
 
 impl Animation for Parallel {
@@ -33,12 +46,12 @@ impl Animation for Parallel {
 }
 
 pub struct Keyframe {
-    from_min: f32,
-    from_max: f32,
-    to_min: f32,
-    to_max: f32,
+    pub from_min: f32,
+    pub from_max: f32,
+    pub to_min: f32,
+    pub to_max: f32,
 
-    animation: Box<dyn Animation>,
+    pub animation: Box<dyn Animation>,
 }
 
 impl Keyframe {
@@ -67,6 +80,35 @@ impl Animation for Keyframe {
             world,
             adjusted_time * (self.to_max - self.to_min) + self.to_min,
         );
+    }
+}
+
+pub struct AnimateTransform {
+    pub object_id: usize,
+    pub from: Transform,
+    pub to: Transform,
+}
+
+impl AnimateTransform {
+    pub fn new(object_id: usize, from: Transform, to: Transform) -> Self {
+        Self {
+            object_id,
+            from,
+            to,
+        }
+    }
+}
+
+impl Animation for AnimateTransform {
+    fn animate(&self, world: &mut World, time: f32) {
+        let object = world.objects.get_mut(&self.object_id).unwrap();
+
+        object.transform = Transform {
+            position: time * (self.to.position - self.from.position.to_vec2())
+                + self.from.position.to_vec2(),
+            scale: time * (self.to.scale - self.from.scale) + self.from.scale,
+            rotation: time * (self.to.rotation - self.from.rotation) + self.from.rotation,
+        };
     }
 }
 

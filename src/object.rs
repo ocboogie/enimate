@@ -1,17 +1,42 @@
-use egui::{Color32, Mesh, Pos2};
+use crate::mesh::Mesh;
+use egui::{Color32, Pos2};
 
+#[derive(Clone, Default, Debug)]
 pub struct Material {
-    color: Color32,
+    pub color: Color32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Transform {
-    position: Pos2,
-    rotation: f32,
-    scale: f32,
+    pub position: Pos2,
+    pub rotation: f32,
+    pub scale: f32,
 }
 
+impl Transform {
+    pub fn with_position(&self, position: Pos2) -> Self {
+        let mut new = self.clone();
+        new.position = position;
+        new
+    }
+
+    pub fn with_rotation(&self, rotation: f32) -> Self {
+        let mut new = self.clone();
+        new.rotation = rotation;
+        new
+    }
+
+    pub fn with_scale(&self, scale: f32) -> Self {
+        let mut new = self.clone();
+        new.scale = scale;
+        new
+    }
+}
+
+#[derive(Default, Clone)]
 pub struct Object {
-    mesh: Mesh,
-    material: Material,
-    transform: Transform,
+    pub mesh: Mesh,
+    pub material: Material,
+    pub transform: Transform,
 }

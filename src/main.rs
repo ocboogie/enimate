@@ -1,237 +1,175 @@
-use eframe::{
-    egui_wgpu::{self, wgpu},
-    wgpu::util::DeviceExt,
-    Renderer,
-};
+use animation::{AnimateTransform, Parallel};
+use egui::epaint::{CircleShape, Tessellator};
+use renderer::Renderer;
 use scene::Scene;
-use std::num::NonZeroU64;
-use std::sync::Arc;
+use world::World;
 
-pub mod animation;
-pub mod object;
-pub mod scene;
-pub mod world;
+mod animation;
+mod animation_ui;
+mod mesh;
+mod object;
+mod renderer;
+mod scene;
+mod scene_builder;
+mod world;
 
-// struct App {}
-//
-// impl eframe::App for App {
-//     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {}
-// }
+struct App {
+    scene: Scene,
+    renderer: Renderer,
+    play: bool,
+    current_time: f32,
+    total_time: f32,
+}
+
+impl eframe::App for App {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let dt = ctx.input(|i| i.stable_dt) as f32;
+
+        if self.play && self.current_time < self.total_time {
+            self.current_time += dt;
+        }
+
+        if self.current_time >= self.total_time {
+            self.play = false;
+            self.current_time = self.total_time;
+        }
+
+        self.scene.update(self.current_time / self.total_time);
+
+        ctx.request_repaint();
+
+        if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
+            self.play = !self.play;
+        }
+
+        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            ui.heading("Animations");
+            ui.separator();
+            self.scene.animation.ui(ui);
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label(format!("Time: {}", self.current_time));
+            if self.play {
+                if ui.button("Pause").clicked() {
+                    self.play = false;
+                }
+            } else {
+                if ui.button("Play").clicked() {
+                    self.play = true;
+                }
+            }
+
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                ui.add(
+                    egui::Slider::new(&mut self.current_time, 0.0..=self.total_time)
+                        .clamp_to_range(true),
+                );
+
+                egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                    let rect = ui.available_rect_before_wrap();
+                    let response = ui.allocate_rect(rect, egui::Sense::drag());
+
+                    self.renderer.paint_at(ui, rect, self.scene.world.clone());
+                });
+            });
+        });
+    }
+}
+
+impl App {
+    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scene: Scene) -> Self {
+        let renderer = Renderer::new(cc).unwrap();
+
+        Self {
+            scene,
+            renderer,
+            play: true,
+            current_time: 0.0,
+            total_time: 5.0,
+        }
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let mut native_options = eframe::NativeOptions::default();
-    native_options.renderer = Renderer::Wgpu;
+    native_options.renderer = eframe::Renderer::Wgpu;
+
+    let mut tessellator = Tessellator::new(1.0, Default::default(), [1, 1], vec![]);
+    let mut circle = egui::Mesh::default();
+    tessellator.tessellate_circle(
+        CircleShape::filled(egui::Pos2::ZERO, 1.0, egui::Color32::WHITE),
+        &mut circle,
+    );
+
+    let circle = mesh::Mesh {
+        vertices: circle
+            .vertices
+            .iter()
+            .map(|v| mesh::Vertex::new(v.pos))
+            .collect(),
+        indices: circle.indices.clone(),
+    };
+
+    let mut world = World::default();
+
+    let transform_1 = object::Transform {
+        position: egui::Pos2::new(100.0, 0.0),
+        rotation: 0.0,
+        scale: 300.0,
+    };
+    world.objects.insert(
+        0,
+        object::Object {
+            mesh: mesh::Mesh::make_triangle(),
+            material: object::Material {
+                color: egui::Color32::RED,
+            },
+            transform: transform_1,
+        },
+    );
+    let transform_2 = object::Transform {
+        position: egui::Pos2::new(100.0, 0.0),
+        rotation: 0.0,
+        scale: 100.0,
+    };
+    world.objects.insert(
+        1,
+        object::Object {
+            mesh: circle,
+            material: object::Material {
+                color: egui::Color32::BLUE,
+            },
+            transform: transform_2,
+        },
+    );
+
+    let animation = Box::new(Parallel::new(vec![
+        Box::new(AnimateTransform::new(
+            0,
+            transform_1.with_rotation(0.0),
+            transform_1.with_rotation(std::f32::consts::PI * 2.0),
+        )),
+        Box::new(AnimateTransform::new(
+            1,
+            transform_2
+                .with_position(egui::Pos2::new(-300.0, 200.0))
+                .with_scale(100.0),
+            transform_2
+                .with_position(egui::Pos2::new(-300.0, -200.0))
+                .with_scale(200.0),
+        )),
+    ]));
+
+    let scene = Scene::new(world, animation);
 
     eframe::run_native(
         "My egui App",
         native_options,
-        Box::new(|cc| Box::new(Custom3d::new(cc).unwrap())),
+        Box::new(|cc| Box::new(App::new(cc, scene))),
     )?;
 
     Ok(())
-}
-
-pub struct Custom3d {
-    angle: f32,
-}
-
-impl Custom3d {
-    pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
-        dbg!();
-        // Get the WGPU render state from the eframe creation context. This can also be retrieved
-        // from `eframe::Frame` when you don't have a `CreationContext` available.
-        dbg!(&cc.wgpu_render_state.is_some());
-        dbg!(&cc.gl.is_some());
-        dbg!(&cc.storage.is_some());
-        let wgpu_render_state = cc.wgpu_render_state.as_ref()?;
-        dbg!();
-
-        let device = &wgpu_render_state.device;
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("custom3d"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("./custom3d_wgpu_shader.wgsl").into()),
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("custom3d"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: NonZeroU64::new(16),
-                },
-                count: None,
-            }],
-        });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("custom3d"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("custom3d"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu_render_state.target_format.into())],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
-
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("custom3d"),
-            contents: bytemuck::cast_slice(&[0.0_f32; 4]), // 16 bytes aligned!
-            // Mapping at creation (as done by the create_buffer_init utility) doesn't require us to to add the MAP_WRITE usage
-            // (this *happens* to workaround this bug )
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("custom3d"),
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-        });
-
-        // Because the graphics pipeline must have the same lifetime as the egui render pass,
-        // instead of storing the pipeline in our `Custom3D` struct, we insert it into the
-        // `paint_callback_resources` type map, which is stored alongside the render pass.
-        wgpu_render_state
-            .renderer
-            .write()
-            .callback_resources
-            .insert(TriangleRenderResources {
-                pipeline,
-                bind_group,
-                uniform_buffer,
-            });
-
-        Some(Self { angle: 0.0 })
-    }
-}
-
-impl eframe::App for Custom3d {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::both()
-                .auto_shrink(false)
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 0.0;
-                        ui.label("The triangle is being painted using ");
-                        ui.hyperlink_to("WGPU", "https://wgpu.rs");
-                        ui.label(" (Portable Rust graphics API awesomeness)");
-                    });
-                    ui.label("It's not a very impressive demo, but it shows you can embed 3D inside of egui.");
-
-                    egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                        self.custom_painting(ui);
-                    });
-                    ui.label("Drag to rotate!");
-                });
-        });
-    }
-}
-
-// Callbacks in egui_wgpu have 3 stages:
-// * prepare (per callback impl)
-// * finish_prepare (once)
-// * paint (per callback impl)
-//
-// The prepare callback is called every frame before paint and is given access to the wgpu
-// Device and Queue, which can be used, for instance, to update buffers and uniforms before
-// rendering.
-// If [`egui_wgpu::Renderer`] has [`egui_wgpu::FinishPrepareCallback`] registered,
-// it will be called after all `prepare` callbacks have been called.
-// You can use this to update any shared resources that need to be updated once per frame
-// after all callbacks have been processed.
-//
-// On both prepare methods you can use the main `CommandEncoder` that is passed-in,
-// return an arbitrary number of user-defined `CommandBuffer`s, or both.
-// The main command buffer, as well as all user-defined ones, will be submitted together
-// to the GPU in a single call.
-//
-// The paint callback is called after finish prepare and is given access to egui's main render pass,
-// which can be used to issue draw commands.
-struct CustomTriangleCallback {
-    angle: f32,
-}
-
-impl egui_wgpu::CallbackTrait for CustomTriangleCallback {
-    fn prepare(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        _egui_encoder: &mut wgpu::CommandEncoder,
-        resources: &mut egui_wgpu::CallbackResources,
-    ) -> Vec<wgpu::CommandBuffer> {
-        let resources: &TriangleRenderResources = resources.get().unwrap();
-        resources.prepare(device, queue, self.angle);
-        Vec::new()
-    }
-
-    fn paint<'a>(
-        &self,
-        _info: egui::PaintCallbackInfo,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        resources: &'a egui_wgpu::CallbackResources,
-    ) {
-        let resources: &TriangleRenderResources = resources.get().unwrap();
-        resources.paint(render_pass);
-    }
-}
-
-impl Custom3d {
-    fn custom_painting(&mut self, ui: &mut egui::Ui) {
-        let (rect, response) =
-            ui.allocate_exact_size(egui::Vec2::splat(300.0), egui::Sense::drag());
-
-        self.angle += response.drag_delta().x * 0.01;
-        ui.painter().add(egui_wgpu::Callback::new_paint_callback(
-            rect,
-            CustomTriangleCallback { angle: self.angle },
-        ));
-    }
-}
-
-struct TriangleRenderResources {
-    pipeline: wgpu::RenderPipeline,
-    bind_group: wgpu::BindGroup,
-    uniform_buffer: wgpu::Buffer,
-}
-
-impl TriangleRenderResources {
-    fn prepare(&self, _device: &wgpu::Device, queue: &wgpu::Queue, angle: f32) {
-        // Update our uniform buffer with the angle from the UI
-        queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[angle, 0.0, 0.0, 0.0]),
-        );
-    }
-
-    fn paint<'rp>(&'rp self, render_pass: &mut wgpu::RenderPass<'rp>) {
-        // Draw our triangle!
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.draw(0..3, 0..1);
-    }
 }

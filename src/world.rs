@@ -2,21 +2,11 @@ use std::collections::HashMap;
 
 use crate::object::Object;
 
-type ObjectID = usize;
+pub type ObjectId = usize;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct World {
-    objects: HashMap<ObjectID, Object>,
+    pub objects: HashMap<ObjectId, Object>,
 }
 
-impl World {
-    // pub fn new(objects: Vec<Object>) -> Self {
-    //     Self { objects }
-    // }
-
-    pub fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // for object in &self.objects.values() {
-        //
-        // }
-    }
-}
+impl World {}

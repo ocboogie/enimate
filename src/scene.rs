@@ -1,21 +1,16 @@
-use crate::{animation::Animation, object::Object, world::World};
+use crate::{animation::Animation, world::World};
 
-#[derive(Default)]
 pub struct Scene {
-    world: World,
-    animations: Vec<Box<dyn Animation>>,
+    pub world: World,
+    pub animation: Box<dyn Animation>,
 }
 
 impl Scene {
-    pub fn new(world: World, animations: Vec<Box<dyn Animation>>) -> Self {
-        Self { world, animations }
+    pub fn new(world: World, animation: Box<dyn Animation>) -> Self {
+        Self { world, animation }
     }
 
-    pub fn show(&mut self, ctx: &egui::Context) {
-        // for animation in &self.animations {
-        //     animation.animate(&mut self.world);
-        // }
-
-        // self.world.update(ctx, frame);
+    pub fn update(&mut self, time: f32) {
+        self.animation.animate(&mut self.world, time);
     }
 }
