@@ -1,43 +1,40 @@
+use std::collections::HashMap;
+
 use crate::{
-    animation::{self, Animation},
-    builder::Builder,
+    builder::{Builder, BuilderState},
+    motion::{self, AddObject, Keyframe, Motion, MotionId, Parallel, Trigger},
     object::{Object, ObjectId},
     scene::Scene,
-    world::ObjectTree,
+    world::{ObjectTree, World},
 };
 
 pub struct SceneBuilder {
-    pub world: ObjectTree,
-    pub animations: Vec<Box<dyn Animation>>,
-    pub current_time: f32,
-    pub scene_length: f32,
+    state: BuilderState,
 }
 
 impl SceneBuilder {
     pub fn new(scene_length: f32) -> Self {
         Self {
-            world: ObjectTree::new(),
-            animations: Vec::new(),
-            current_time: 0.0,
-            scene_length,
+            state: BuilderState::new(scene_length),
         }
     }
 
-    pub fn finish(self) -> Scene {
-        Scene::new(
-            self.world,
-            Box::new(animation::Parallel::new(self.animations)),
-        )
+    fn create_root_motion(&self) -> Box<dyn Motion> {
+        Box::new(Parallel::new(self.state.root_motions.clone()))
+    }
+
+    pub fn finish(mut self) -> Scene {
+        let root = self.create_root_motion();
+        let root_id = rand::random::<usize>();
+
+        self.state.motions.insert(root_id, root);
+
+        Scene::new(self.state.motions, root_id)
     }
 }
 
 impl Builder for SceneBuilder {
-    fn add_object(&mut self, id: ObjectId, object: Object, rooted: bool) {
-        self.world.add_object(id, object, rooted);
-    }
-
-    fn add_animation(&mut self, animation: Box<dyn Animation>) {
-        // TODO:
-        self.animations.push(animation);
+    fn state(&mut self) -> &mut BuilderState {
+        &mut self.state
     }
 }

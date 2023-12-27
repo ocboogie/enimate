@@ -1,0 +1,7 @@
+ - Either simulate strokes on the CPU by sending two meshes to the GPU as
+   different draw calls, or implement it into the shader?
+ - Add scenes in scenes that have different time scales (i.e., I could have a 
+   scene in a scene that has a specific range of time and a different time scale
+ - Add debugging tech like outlines and wireframes (perhaps in the shader)
+ - Make motions more efficient by using references for their objects 
+   and have the Motion trait have a lifetime

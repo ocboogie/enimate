@@ -1,4 +1,3 @@
-use animation::{AnimateTransform, Parallel};
 use builder::Builder;
 use component::Component;
 use egui::{
@@ -6,17 +5,20 @@ use egui::{
     pos2, Color32, Vec2,
 };
 use lyon::path::Path;
-use object::{Material, ObjectId, ObjectKind, Transform};
+use mesh::Mesh;
+use motion::{AnimateTransform, Parallel};
+use motion_ui::fixme;
+use object::{Material, Model, Object, ObjectId, ObjectKind, Transform};
 use renderer::Renderer;
 use scene::Scene;
 use scene_builder::SceneBuilder;
 use world::ObjectTree;
 
-mod animation;
-mod animation_ui;
 mod builder;
 mod component;
 mod mesh;
+mod motion;
+mod motion_ui;
 mod object;
 mod renderer;
 mod scene;
@@ -33,7 +35,7 @@ struct App {
 }
 
 fn show_object(ui: &mut egui::Ui, objects: &ObjectTree, id: ObjectId) {
-    let object = objects.get_object(id).unwrap();
+    let object = objects.get(&id).unwrap();
 
     ui.collapsing(format!("Object {}", id), |ui| {
         ui.label(format!(
@@ -74,19 +76,26 @@ impl eframe::App for App {
             self.current_time = self.total_time;
         }
 
-        self.scene.update(self.current_time / self.total_time);
-
         ctx.request_repaint();
 
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            self.play = !self.play;
+            if self.current_time >= self.total_time {
+                self.current_time = 0.0;
+                self.play = true;
+            } else {
+                self.play = !self.play;
+            }
         }
+
+        let objects = self.scene.objects_at(self.current_time);
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.heading("Animations");
                 ui.separator();
-                self.scene.animation.ui(ui);
+                let root = self.scene.root;
+                fixme(ui, &mut self.scene, root);
+                // self.scene.root_mut().ui(ui, &mut self.scene);
             });
         });
 
@@ -94,7 +103,7 @@ impl eframe::App for App {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.heading("Objects");
                 ui.separator();
-                show_object(ui, &self.scene.world, self.scene.world.root);
+                show_object(ui, &objects, objects.root);
             });
         });
 
@@ -120,7 +129,7 @@ impl eframe::App for App {
                     let rect = ui.available_rect_before_wrap();
                     let response = ui.allocate_rect(rect, egui::Sense::drag());
 
-                    self.renderer.paint_at(ui, rect, self.scene.world.clone());
+                    self.renderer.paint_at(ui, rect, objects);
                 });
             });
         });
@@ -151,78 +160,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     scene_builder
         .line(
-            pos2(-100.0, 0.0),
-            pos2(100.0, 0.0),
+            pos2(0.0, 0.0),
+            pos2(0.0, 100.0),
             10.0,
-            Color32::RED.into(),
+            Color32::GREEN.into(),
         )
-        .with_position(pos2(10.0, 110.0))
-        .center_anchor()
-        .with_animations()
-        .translate(pos2(0.0, -500.0))
-        .rotate(std::f32::consts::PI / 2.0)
         .add();
 
-    let space = 500.0;
-    for i in 0..9 {
-        scene_builder
-            .circle(
-                (space / 9 as f32) * i as f32 - space / 2.0,
-                100.0,
-                10.0,
-                Color32::BLUE.into(),
-            )
-            .with_animations()
-            .translate(pos2((space / 9 as f32) * i as f32 - space / 2.0, -500.0))
-            .add();
-    }
-
-    scene_builder
-        .line(
-            pos2(-100.0, 0.0),
-            pos2(100.0, 0.0),
-            10.0,
-            Color32::from_gray(128).into(),
-        )
-        .center_anchor()
-        .with_animations()
-        .rotate(std::f32::consts::PI)
+    let grid = scene_builder
+        .build(Grid::new(10, 1.0, Vec2::new(100.0, 100.0), Color32::GREEN))
+        .with_scale(10.0)
         .add();
-
-    let mut group = scene_builder.group();
-
-    for i in 0..9 {
-        group
-            .build(Grid::new(
-                10,
-                2.5,
-                Vec2::new(100.0, 100.0),
-                Color32::from_gray(128),
-            ))
-            .with_position(pos2((i % 3) as f32 * 100.0, (i / 3) as f32 * 100.0))
-            // .with_anchor(pos2(250.0, 250.0))
-            // .with_position(pos2(-100.0, 0.0))
-            .with_animations()
-            .rotate(std::f32::consts::PI)
-            .add();
-    }
-
-    group
-        .finish()
-        .with_anchor(pos2(100.0, 100.0))
-        .with_scale(2.5)
-        .with_animations()
-        .rotate(std::f32::consts::PI / 2.0)
-        .add();
-
-    // scene_builder
-    //     .circle(-200.0, 200.0, 100.0, Color32::RED.into())
-    //     .add();
-    // scene_builder
-    //     .circle(200.0, -200.0, 100.0, Color32::BLUE.into())
-    //     .with_animations()
-    //     .translate(pos2(-300.0, 200.0))
-    //     .add();
+    scene_builder.animate(grid, 0.5, |a| a.fade_in());
 
     let scene = scene_builder.finish();
 
@@ -268,16 +217,6 @@ impl Component for Grid {
                 self.size.y / 2.0,
             ));
             pbuilder.close();
-            // builder
-            //     .line(
-            //         pos2(0.0, 0.0),
-            //         pos2(0.0, self.size.y),
-            //         self.width,
-            //         self.color.into(),
-            //     )
-            //     .with_animations()
-            //     .translate(pos2(x as f32 * horizontal_stride, 0.0))
-            //     .add();
         }
 
         let vertical_stride = self.size.y / self.lines as f32;
@@ -291,16 +230,6 @@ impl Component for Grid {
                 y as f32 * vertical_stride - self.size.y / 2.0,
             ));
             pbuilder.close();
-            // builder
-            //     .line(
-            //         pos2(0.0, 0.0),
-            //         pos2(self.size.x, 0.0),
-            //         self.width,
-            //         self.color.into(),
-            //     )
-            //     .with_animations()
-            //     .translate(pos2(0.0, y as f32 * vertical_stride))
-            //     .add();
         }
 
         let path = pbuilder.build();

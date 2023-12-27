@@ -1,15 +1,68 @@
-use egui::Pos2;
-use std::collections::HashMap;
+use egui::{Pos2, Rect};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
 use crate::{
     mesh::Mesh,
     object::{Material, Model, Object, ObjectId, ObjectKind, Transform},
 };
 
+use crate::motion::{Motion, MotionId};
+
+pub struct World<'a> {
+    pub objects: &'a mut ObjectTree,
+    motions: &'a HashMap<MotionId, Box<dyn Motion>>,
+    pub time: f32,
+}
+
+impl<'a> World<'a> {
+    pub fn new(
+        time: f32,
+        objects: &'a mut ObjectTree,
+        motions: &'a HashMap<MotionId, Box<dyn Motion>>,
+    ) -> Self {
+        Self {
+            objects,
+            motions,
+            time,
+        }
+    }
+
+    pub fn play(&mut self, motion: MotionId) {
+        // TODO: Provide a warning here somehow if the motion doesn't exist.
+        let motion = self.motions.get(&motion).unwrap();
+        motion.animate(self);
+    }
+
+    pub fn play_at(&mut self, motion: MotionId, time: f32) {
+        let motion = self.motions.get(&motion).unwrap();
+        let current_time = self.time;
+        self.time = time;
+        motion.animate(self);
+        self.time = current_time;
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ObjectTree {
     pub root: ObjectId,
     objects: HashMap<ObjectId, Object>,
+}
+
+impl Deref for ObjectTree {
+    type Target = HashMap<ObjectId, Object>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.objects
+    }
+}
+
+impl DerefMut for ObjectTree {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.objects
+    }
 }
 
 pub struct RenderObject {
@@ -23,7 +76,7 @@ impl ObjectTree {
     pub fn new() -> Self {
         let mut objects = HashMap::new();
 
-        let root = rand::random::<usize>();
+        let root = 0;
         objects.insert(
             root,
             Object {
@@ -68,7 +121,7 @@ impl ObjectTree {
         objects
     }
 
-    pub fn add_object(&mut self, id: usize, object: Object, rooted: bool) {
+    pub fn add(&mut self, id: usize, object: Object, rooted: bool) {
         if rooted {
             let root = self.objects.get_mut(&self.root).expect("No root");
 
@@ -82,11 +135,29 @@ impl ObjectTree {
         self.objects.insert(id, object);
     }
 
-    pub fn get_object(&self, id: ObjectId) -> Option<&Object> {
-        self.objects.get(&id)
-    }
+    // pub fn get(&self, id: ObjectId) -> Option<&Object> {
+    //     self.objects.get(&id)
+    // }
+    //
+    // pub fn get_mut(&mut self, id: ObjectId) -> Option<&mut Object> {
+    //     self.objects.get_mut(&id)
+    // }
+    //
+    pub fn bounds(&self, object_id: &ObjectId) -> Rect {
+        let object = self.objects.get(object_id).unwrap();
 
-    pub fn get_object_mut(&mut self, id: ObjectId) -> Option<&mut Object> {
-        self.objects.get_mut(&id)
+        match &object.object_kind {
+            ObjectKind::Model(model) => model.mesh.bounds(),
+            ObjectKind::Group(group) => {
+                let mut bounds = Rect::NOTHING;
+
+                for child_id in group {
+                    let child_bounds = self.bounds(child_id);
+                    bounds = bounds.union(child_bounds);
+                }
+
+                bounds
+            }
+        }
     }
 }

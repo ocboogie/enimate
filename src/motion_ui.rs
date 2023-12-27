@@ -1,46 +1,65 @@
-use crate::animation::{AnimateTransform, Animation, Keyframe, Noop, Parallel, Sequence};
+use crate::{
+    motion::{
+        AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, Noop, Parallel, Trigger,
+    },
+    scene::Scene,
+};
 
-pub trait AnimationUI {
-    fn ui(&mut self, ui: &mut egui::Ui);
+pub trait MotionUi {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene);
 }
 
-impl AnimationUI for Sequence {
-    fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.label("Sequence");
-        ui.indent("Sequence", |ui| {
-            for animation in &mut self.animations {
-                animation.ui(ui);
-            }
-        });
-    }
+pub fn fixme(ui: &mut egui::Ui, scene: &mut Scene, motion_id: MotionId) {
+    let mut motion = scene.motions.remove(&motion_id).unwrap();
+    motion.ui(ui, scene);
+    scene.motions.insert(motion_id, motion);
 }
 
-impl AnimationUI for Parallel {
-    fn ui(&mut self, ui: &mut egui::Ui) {
+impl MotionUi for Parallel {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
         ui.label("Parallel");
         ui.indent("Parallel", |ui| {
-            for animation in &mut self.animations {
-                animation.ui(ui);
+            for id in &mut self.motions {
+                fixme(ui, scene, *id);
             }
         });
     }
 }
 
-impl AnimationUI for Keyframe {
-    fn ui(&mut self, ui: &mut egui::Ui) {
+impl MotionUi for Keyframe {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
         ui.label("Keyframe");
         ui.indent("Keyframe", |ui| {
             ui.add(egui::Slider::new(&mut self.from_min, 0.0..=1.0).text("From Min"));
             ui.add(egui::Slider::new(&mut self.from_max, 0.0..=1.0).text("From Max"));
             ui.add(egui::Slider::new(&mut self.to_min, 0.0..=1.0).text("To Min"));
             ui.add(egui::Slider::new(&mut self.to_max, 0.0..=1.0).text("To Max"));
-            self.animation.ui(ui);
+            fixme(ui, scene, self.motion);
         });
     }
 }
 
-impl AnimationUI for AnimateTransform {
-    fn ui(&mut self, ui: &mut egui::Ui) {
+impl MotionUi for Trigger {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
+        ui.label("Trigger");
+        ui.indent("Trigger", |ui| {
+            ui.add(egui::Slider::new(&mut self.time, 0.0..=1.0).text("Time"));
+            fixme(ui, scene, self.motion);
+        });
+    }
+}
+
+impl MotionUi for AddObject {
+    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
+        ui.label("Add Object");
+        ui.indent("Add Object", |ui| {
+            ui.label(format!("Object: {}", self.object_id));
+        });
+    }
+}
+
+impl MotionUi for AnimateTransform {
+    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
         ui.label("Animate Transform");
         ui.indent("Animate Transform", |ui| {
             ui.add(
@@ -88,8 +107,14 @@ impl AnimationUI for AnimateTransform {
     }
 }
 
-impl AnimationUI for Noop {
-    fn ui(&mut self, ui: &mut egui::Ui) {
+impl MotionUi for Noop {
+    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
         ui.label("Noop");
+    }
+}
+
+impl MotionUi for FadeIn {
+    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
+        ui.label("Fade In");
     }
 }
