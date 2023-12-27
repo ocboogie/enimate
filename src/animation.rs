@@ -1,9 +1,15 @@
 use crate::animation_ui::AnimationUI;
-use crate::{object::Transform, world::World};
+use crate::{object::Transform, world::ObjectTree};
 
+// TODO: Temp solution. Animations should exist without "knowing" about the UI.
+//       However, we can't upcast to AnimationUI we only have a Box<dyn Animation>.
+//       So, for now, we have to implement AnimationUI for each animation.
+/// An animation is the most basic momvement primitive.
+/// It is a function that takes a world and a time and updates the world.
+/// The time is a value between 0 and 1.
 pub trait Animation: AnimationUI {
     // Time is an f32 between 0 and 1.
-    fn animate(&self, world: &mut World, time: f32);
+    fn animate(&self, world: &mut ObjectTree, time: f32);
 }
 
 pub struct Sequence {
@@ -11,7 +17,7 @@ pub struct Sequence {
 }
 
 impl Animation for Sequence {
-    fn animate(&self, world: &mut World, time: f32) {
+    fn animate(&self, world: &mut ObjectTree, time: f32) {
         let current_animation_index = (time * self.animations.len() as f32) as usize;
         let current_animation_time =
             time * self.animations.len() as f32 - current_animation_index as f32;
@@ -24,7 +30,7 @@ impl Animation for Sequence {
 pub struct Noop;
 
 impl Animation for Noop {
-    fn animate(&self, _world: &mut World, _time: f32) {}
+    fn animate(&self, _world: &mut ObjectTree, _time: f32) {}
 }
 
 pub struct Parallel {
@@ -38,7 +44,7 @@ impl Parallel {
 }
 
 impl Animation for Parallel {
-    fn animate(&self, world: &mut World, time: f32) {
+    fn animate(&self, world: &mut ObjectTree, time: f32) {
         for animation in &self.animations {
             animation.animate(world, time);
         }
@@ -73,13 +79,20 @@ impl Keyframe {
 }
 
 impl Animation for Keyframe {
-    fn animate(&self, world: &mut World, time: f32) {
+    fn animate(&self, world: &mut ObjectTree, time: f32) {
         let adjusted_time = (time - self.from_min) / (self.from_max - self.from_min);
 
-        self.animation.animate(
-            world,
-            adjusted_time * (self.to_max - self.to_min) + self.to_min,
-        );
+        if adjusted_time < 0.0 {
+            return;
+        }
+
+        if adjusted_time > 1.0 {
+            return;
+        }
+
+        let adjusted_time = adjusted_time * (self.to_max - self.to_min) + self.to_min;
+
+        self.animation.animate(world, adjusted_time);
     }
 }
 
@@ -100,14 +113,16 @@ impl AnimateTransform {
 }
 
 impl Animation for AnimateTransform {
-    fn animate(&self, world: &mut World, time: f32) {
-        let object = world.objects.get_mut(&self.object_id).unwrap();
+    fn animate(&self, world: &mut ObjectTree, time: f32) {
+        let object = world.get_object_mut(self.object_id).unwrap();
 
         object.transform = Transform {
             position: time * (self.to.position - self.from.position.to_vec2())
                 + self.from.position.to_vec2(),
             scale: time * (self.to.scale - self.from.scale) + self.from.scale,
             rotation: time * (self.to.rotation - self.from.rotation) + self.from.rotation,
+            anchor: time * (self.to.anchor - self.from.anchor.to_vec2())
+                + self.from.anchor.to_vec2(),
         };
     }
 }
@@ -119,14 +134,14 @@ mod tests {
     struct ExpectTime(f32);
 
     impl Animation for ExpectTime {
-        fn animate(&self, world: &mut World, time: f32) {
+        fn animate(&self, world: &mut ObjectTree, time: f32) {
             assert_eq!(self.0, time);
         }
     }
 
     #[test]
     fn test_keyframe() {
-        let mut world = World::default();
+        let mut world = ObjectTree::default();
 
         Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.0))).animate(&mut world, 0.0);
         Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 0.5);

@@ -11,10 +11,11 @@ struct Camera {
 };
 
 struct Transform {
-    // @size(16) position: vec2<f32>, // pad to 16 bytes
+     // @size(16) position: vec2<f32>, // pad to 16 bytes
     position: vec2<f32>,
     rotation: f32,
     scale: f32,
+    anchor: vec2<f32>, // This might have to be padded to 16 bytes
 };
 
 @group(0) @binding(0)
@@ -28,12 +29,13 @@ fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
+    let centered_pos = model.position - transform.anchor;
     let rotated_pos = vec2<f32>(
-        model.position.x * cos(transform.rotation) - model.position.y * sin(transform.rotation),
-        model.position.x * sin(transform.rotation) + model.position.y * cos(transform.rotation),
+        centered_pos.x * cos(transform.rotation) - centered_pos.y * sin(transform.rotation),
+        centered_pos.x * sin(transform.rotation) + centered_pos.y * cos(transform.rotation),
     );
     let scaled_pos = rotated_pos * transform.scale;
-    let translated_pos = scaled_pos + transform.position;
+    let translated_pos = scaled_pos + transform.position + transform.anchor;
 
     let pos = camera.view_proj * translated_pos;
 

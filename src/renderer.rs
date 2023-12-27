@@ -1,6 +1,6 @@
 use crate::mesh::Vertex;
-use crate::object::{Material, Object};
-use crate::world::{ObjectId, World};
+use crate::object::{Material, ObjectId, Transform};
+use crate::world::{ObjectTree, RenderObject};
 use eframe::wgpu::ColorTargetState;
 use eframe::{
     egui_wgpu::{self, wgpu},
@@ -146,14 +146,14 @@ impl Renderer {
             pipeline,
             camera_bind_group,
             camera_buffer,
-            loaded_meshes: HashMap::new(),
+            loaded_objects: HashMap::new(),
         }
     }
 }
 
 struct RendererCallback {
     id: usize,
-    world: World,
+    world: ObjectTree,
     render_size: egui::Vec2,
 }
 
@@ -203,7 +203,7 @@ impl egui_wgpu::CallbackTrait for RendererCallback {
 }
 
 impl Renderer {
-    pub fn paint_at(&mut self, ui: &mut egui::Ui, rect: Rect, world: World) {
+    pub fn paint_at(&mut self, ui: &mut egui::Ui, rect: Rect, world: ObjectTree) {
         ui.painter_at(rect)
             .add(egui_wgpu::Callback::new_paint_callback(
                 rect,
@@ -216,6 +216,23 @@ impl Renderer {
     }
 }
 
+// Same as Transform but we take out anchor
+// #[repr(C)]
+// #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+// struct TransformGpu {
+//     position: [f32; 2],
+//     rotation: f32,
+//     scale: f32,
+// }
+
+// impl From<Transform> for TransformGpu {
+//     fn from(transform: Transform) -> Self {
+//         Self {
+//             position:
+//         }
+//     }
+// }
+//
 // Same as Material but we convert the color to rgba
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -230,7 +247,7 @@ impl From<Material> for MaterialGpu {
         }
     }
 }
-struct LoadedMesh {
+struct LoadedObject {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub transform_buffer: wgpu::Buffer,
@@ -242,38 +259,38 @@ struct RendererResources {
     pipeline: wgpu::RenderPipeline,
     camera_bind_group: wgpu::BindGroup,
     camera_buffer: wgpu::Buffer,
-    loaded_meshes: HashMap<ObjectId, LoadedMesh>,
+    loaded_objects: HashMap<ObjectId, LoadedObject>,
 }
 
 impl RendererResources {
-    fn load_mesh(&mut self, device: &wgpu::Device, id: &ObjectId, object: &Object) {
+    fn load_object(&mut self, device: &wgpu::Device, object: &RenderObject) {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Vertex Buffer: {}", id)),
+            label: Some(&format!("Vertex Buffer: {}", object.id)),
             contents: bytemuck::cast_slice(&object.mesh.vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Index Buffer: {}", id)),
+            label: Some(&format!("Index Buffer: {}", object.id)),
             contents: bytemuck::cast_slice(&object.mesh.indices),
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Transform Buffer: {}", id)),
+            label: Some(&format!("Transform Buffer: {}", object.id)),
             // No need for padding, since transform is 16 bytes aligned.
             contents: bytemuck::bytes_of(&object.transform),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
         });
         let material_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Material Buffer: {}", id)),
+            label: Some(&format!("Material Buffer: {}", object.id)),
             // No need for padding, since material is 16 bytes aligned.
             contents: bytemuck::bytes_of(&MaterialGpu::from(object.material.clone())),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(&format!("Bind Group: {}", id)),
+            label: Some(&format!("Bind Group: {}", object.id)),
             layout: &self.pipeline.get_bind_group_layout(1),
             entries: &[
                 wgpu::BindGroupEntry {
@@ -287,9 +304,9 @@ impl RendererResources {
             ],
         });
 
-        self.loaded_meshes.insert(
-            *id,
-            LoadedMesh {
+        self.loaded_objects.insert(
+            object.id,
+            LoadedObject {
                 vertex_buffer,
                 index_buffer,
                 transform_buffer,
@@ -299,27 +316,27 @@ impl RendererResources {
         );
     }
 
-    fn update_mesh(queue: &wgpu::Queue, object: &Object, loaded_mesh: &LoadedMesh) {
+    fn update_mesh(queue: &wgpu::Queue, object: &RenderObject, loaded_objects: &LoadedObject) {
         // FIXME: Might have a bigger size than the vertex buffer, so
         //        just double check that the buffer can grow, which I don't
         //        think it can.
         queue.write_buffer(
-            &loaded_mesh.vertex_buffer,
+            &loaded_objects.vertex_buffer,
             0,
             bytemuck::cast_slice(&object.mesh.vertices),
         );
         queue.write_buffer(
-            &loaded_mesh.index_buffer,
+            &loaded_objects.index_buffer,
             0,
             bytemuck::cast_slice(&object.mesh.indices),
         );
         queue.write_buffer(
-            &loaded_mesh.transform_buffer,
+            &loaded_objects.transform_buffer,
             0,
             bytemuck::bytes_of(&object.transform),
         );
         queue.write_buffer(
-            &loaded_mesh.material_buffer,
+            &loaded_objects.material_buffer,
             0,
             bytemuck::bytes_of(&MaterialGpu::from(object.material.clone())),
         );
@@ -329,7 +346,7 @@ impl RendererResources {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        world: &World,
+        world: &ObjectTree,
         render_size: egui::Vec2,
     ) {
         queue.write_buffer(
@@ -341,21 +358,21 @@ impl RendererResources {
         // FIXME: Bad performance, since it is updating the entire buffer every
         //        frame. Should hashing be used to determine if the buffer
         //        needs to be updated?
-        for (id, object) in &world.objects {
-            if let Some(loaded_mesh) = self.loaded_meshes.get(id) {
-                Self::update_mesh(queue, object, loaded_mesh);
+        for object in &world.render() {
+            if let Some(loaded_object) = self.loaded_objects.get(&object.id) {
+                Self::update_mesh(queue, object, loaded_object);
             } else {
-                self.load_mesh(device, id, object);
+                self.load_object(device, object);
             }
         }
     }
 
-    fn paint<'rp>(&'rp self, render_pass: &mut wgpu::RenderPass<'rp>, world: &World) {
+    fn paint<'rp>(&'rp self, render_pass: &mut wgpu::RenderPass<'rp>, world: &ObjectTree) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-        for (id, object) in &world.objects {
-            let loaded_mesh = self.loaded_meshes.get(id).expect("Mesh not loaded");
+        for RenderObject { id, mesh, .. } in &world.render() {
+            let loaded_mesh = self.loaded_objects.get(id).expect("Mesh not loaded");
 
             render_pass.set_vertex_buffer(0, loaded_mesh.vertex_buffer.slice(..));
             render_pass.set_index_buffer(
@@ -365,7 +382,7 @@ impl RendererResources {
 
             render_pass.set_bind_group(1, &loaded_mesh.bind_group, &[]);
 
-            render_pass.draw_indexed(0..object.mesh.indices.len() as u32, 0, 0..1);
+            render_pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
         }
     }
 }

@@ -1,16 +1,27 @@
 use animation::{AnimateTransform, Parallel};
-use egui::epaint::{CircleShape, Tessellator};
+use builder::Builder;
+use component::Component;
+use egui::{
+    epaint::{CircleShape, Tessellator},
+    pos2, Color32, Vec2,
+};
+use lyon::path::Path;
+use object::{Material, ObjectId, ObjectKind, Transform};
 use renderer::Renderer;
 use scene::Scene;
-use world::World;
+use scene_builder::SceneBuilder;
+use world::ObjectTree;
 
 mod animation;
 mod animation_ui;
+mod builder;
+mod component;
 mod mesh;
 mod object;
 mod renderer;
 mod scene;
 mod scene_builder;
+mod utils;
 mod world;
 
 struct App {
@@ -19,6 +30,35 @@ struct App {
     play: bool,
     current_time: f32,
     total_time: f32,
+}
+
+fn show_object(ui: &mut egui::Ui, objects: &ObjectTree, id: ObjectId) {
+    let object = objects.get_object(id).unwrap();
+
+    ui.collapsing(format!("Object {}", id), |ui| {
+        ui.label(format!(
+            "Position: ({}, {})",
+            object.transform.position.x, object.transform.position.y
+        ));
+        ui.label(format!("Scale: {}", object.transform.scale));
+        ui.label(format!("Rotation: {}", object.transform.rotation));
+        ui.label(format!(
+            "Anchor: ({}, {})",
+            object.transform.anchor.x, object.transform.anchor.y
+        ));
+
+        match object.object_kind {
+            ObjectKind::Model(_) => {
+                ui.label("Model");
+            }
+            ObjectKind::Group(ref children) => {
+                ui.label("Group");
+                for child in children {
+                    show_object(ui, objects, *child);
+                }
+            }
+        }
+    });
 }
 
 impl eframe::App for App {
@@ -43,9 +83,19 @@ impl eframe::App for App {
         }
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Animations");
-            ui.separator();
-            self.scene.animation.ui(ui);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.heading("Animations");
+                ui.separator();
+                self.scene.animation.ui(ui);
+            });
+        });
+
+        egui::SidePanel::right("object_panel").show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.heading("Objects");
+                ui.separator();
+                show_object(ui, &self.scene.world, self.scene.world.root);
+            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -86,7 +136,7 @@ impl App {
             renderer,
             play: true,
             current_time: 0.0,
-            total_time: 5.0,
+            total_time: 2.5,
         }
     }
 }
@@ -97,73 +147,84 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut native_options = eframe::NativeOptions::default();
     native_options.renderer = eframe::Renderer::Wgpu;
 
-    let mut tessellator = Tessellator::new(1.0, Default::default(), [1, 1], vec![]);
-    let mut circle = egui::Mesh::default();
-    tessellator.tessellate_circle(
-        CircleShape::filled(egui::Pos2::ZERO, 1.0, egui::Color32::WHITE),
-        &mut circle,
-    );
+    let mut scene_builder = SceneBuilder::new(5.0);
 
-    let circle = mesh::Mesh {
-        vertices: circle
-            .vertices
-            .iter()
-            .map(|v| mesh::Vertex::new(v.pos))
-            .collect(),
-        indices: circle.indices.clone(),
-    };
+    scene_builder
+        .line(
+            pos2(-100.0, 0.0),
+            pos2(100.0, 0.0),
+            10.0,
+            Color32::RED.into(),
+        )
+        .with_position(pos2(10.0, 110.0))
+        .center_anchor()
+        .with_animations()
+        .translate(pos2(0.0, -500.0))
+        .rotate(std::f32::consts::PI / 2.0)
+        .add();
 
-    let mut world = World::default();
+    let space = 500.0;
+    for i in 0..9 {
+        scene_builder
+            .circle(
+                (space / 9 as f32) * i as f32 - space / 2.0,
+                100.0,
+                10.0,
+                Color32::BLUE.into(),
+            )
+            .with_animations()
+            .translate(pos2((space / 9 as f32) * i as f32 - space / 2.0, -500.0))
+            .add();
+    }
 
-    let transform_1 = object::Transform {
-        position: egui::Pos2::new(100.0, 0.0),
-        rotation: 0.0,
-        scale: 300.0,
-    };
-    world.objects.insert(
-        0,
-        object::Object {
-            mesh: mesh::Mesh::make_triangle(),
-            material: object::Material {
-                color: egui::Color32::RED,
-            },
-            transform: transform_1,
-        },
-    );
-    let transform_2 = object::Transform {
-        position: egui::Pos2::new(100.0, 0.0),
-        rotation: 0.0,
-        scale: 100.0,
-    };
-    world.objects.insert(
-        1,
-        object::Object {
-            mesh: circle,
-            material: object::Material {
-                color: egui::Color32::BLUE,
-            },
-            transform: transform_2,
-        },
-    );
+    scene_builder
+        .line(
+            pos2(-100.0, 0.0),
+            pos2(100.0, 0.0),
+            10.0,
+            Color32::from_gray(128).into(),
+        )
+        .center_anchor()
+        .with_animations()
+        .rotate(std::f32::consts::PI)
+        .add();
 
-    let animation = Box::new(Parallel::new(vec![
-        Box::new(AnimateTransform::new(
-            0,
-            transform_1.with_rotation(0.0),
-            transform_1.with_rotation(std::f32::consts::PI * 2.0),
-        )),
-        Box::new(AnimateTransform::new(
-            1,
-            transform_2
-                .with_position(egui::Pos2::new(-300.0, 200.0))
-                .with_scale(100.0),
-            transform_2
-                .with_position(egui::Pos2::new(-300.0, -200.0))
-                .with_scale(200.0),
-        )),
-    ]));
+    let mut group = scene_builder.group();
 
-    let scene = Scene::new(world, animation);
+    for i in 0..9 {
+        group
+            .build(Grid::new(
+                10,
+                2.5,
+                Vec2::new(100.0, 100.0),
+                Color32::from_gray(128),
+            ))
+            .with_position(pos2((i % 3) as f32 * 100.0, (i / 3) as f32 * 100.0))
+            // .with_anchor(pos2(250.0, 250.0))
+            // .with_position(pos2(-100.0, 0.0))
+            .with_animations()
+            .rotate(std::f32::consts::PI)
+            .add();
+    }
+
+    group
+        .finish()
+        .with_anchor(pos2(100.0, 100.0))
+        .with_scale(2.5)
+        .with_animations()
+        .rotate(std::f32::consts::PI / 2.0)
+        .add();
+
+    // scene_builder
+    //     .circle(-200.0, 200.0, 100.0, Color32::RED.into())
+    //     .add();
+    // scene_builder
+    //     .circle(200.0, -200.0, 100.0, Color32::BLUE.into())
+    //     .with_animations()
+    //     .translate(pos2(-300.0, 200.0))
+    //     .add();
+
+    let scene = scene_builder.finish();
 
     eframe::run_native(
         "My egui App",
@@ -172,4 +233,77 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     Ok(())
+}
+
+struct Grid {
+    lines: usize,
+    width: f32,
+    size: Vec2,
+    color: Color32,
+}
+
+impl Grid {
+    fn new(lines: usize, width: f32, size: Vec2, color: Color32) -> Self {
+        Self {
+            lines,
+            width,
+            size,
+            color,
+        }
+    }
+}
+
+impl Component for Grid {
+    fn build(&self, builder: &mut impl Builder) {
+        let mut pbuilder = Path::builder();
+
+        let horizontal_stride = self.size.x / self.lines as f32;
+        for x in 0..=self.lines {
+            pbuilder.begin(lyon::math::point(
+                x as f32 * horizontal_stride - self.size.x / 2.0,
+                -self.size.y / 2.0,
+            ));
+            pbuilder.line_to(lyon::math::point(
+                x as f32 * horizontal_stride - self.size.x / 2.0,
+                self.size.y / 2.0,
+            ));
+            pbuilder.close();
+            // builder
+            //     .line(
+            //         pos2(0.0, 0.0),
+            //         pos2(0.0, self.size.y),
+            //         self.width,
+            //         self.color.into(),
+            //     )
+            //     .with_animations()
+            //     .translate(pos2(x as f32 * horizontal_stride, 0.0))
+            //     .add();
+        }
+
+        let vertical_stride = self.size.y / self.lines as f32;
+        for y in 0..=self.lines {
+            pbuilder.begin(lyon::math::point(
+                -self.size.x / 2.0,
+                y as f32 * vertical_stride - self.size.y / 2.0,
+            ));
+            pbuilder.line_to(lyon::math::point(
+                self.size.x / 2.0,
+                y as f32 * vertical_stride - self.size.y / 2.0,
+            ));
+            pbuilder.close();
+            // builder
+            //     .line(
+            //         pos2(0.0, 0.0),
+            //         pos2(self.size.x, 0.0),
+            //         self.width,
+            //         self.color.into(),
+            //     )
+            //     .with_animations()
+            //     .translate(pos2(0.0, y as f32 * vertical_stride))
+            //     .add();
+        }
+
+        let path = pbuilder.build();
+        builder.path(path, self.width, self.color.into()).add();
+    }
 }

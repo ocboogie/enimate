@@ -1,12 +1,12 @@
-use crate::{animation::Animation, world::World};
+use crate::{animation::Animation, world::ObjectTree};
 
 pub struct Scene {
-    pub world: World,
+    pub world: ObjectTree,
     pub animation: Box<dyn Animation>,
 }
 
 impl Scene {
-    pub fn new(world: World, animation: Box<dyn Animation>) -> Self {
+    pub fn new(world: ObjectTree, animation: Box<dyn Animation>) -> Self {
         Self { world, animation }
     }
 
