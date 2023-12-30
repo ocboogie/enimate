@@ -1,6 +1,8 @@
 use eframe::egui_wgpu::wgpu;
 use egui::{pos2, Pos2, Rect};
 
+use crate::object::Transform;
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
@@ -49,7 +51,7 @@ impl Mesh {
         }
     }
 
-    pub fn bounds(&self) -> Rect {
+    pub fn bounding_box(&self) -> Rect {
         let mut min = Pos2::new(f32::MAX, f32::MAX);
         let mut max = Pos2::new(f32::MIN, f32::MIN);
 

@@ -1,18 +1,18 @@
-use builder::Builder;
+use builder::{Builder, Left};
 use component::Component;
 use egui::{
     epaint::{CircleShape, Tessellator},
-    pos2, Color32, Vec2,
+    pos2, Color32, Stroke, Vec2,
 };
 use lyon::path::Path;
 use mesh::Mesh;
 use motion::{AnimateTransform, Parallel};
 use motion_ui::fixme;
 use object::{Material, Model, Object, ObjectId, ObjectKind, Transform};
+use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
 use scene_builder::SceneBuilder;
-use world::ObjectTree;
 
 mod builder;
 mod component;
@@ -20,6 +20,7 @@ mod mesh;
 mod motion;
 mod motion_ui;
 mod object;
+mod object_tree;
 mod renderer;
 mod scene;
 mod scene_builder;
@@ -31,7 +32,6 @@ struct App {
     renderer: Renderer,
     play: bool,
     current_time: f32,
-    total_time: f32,
 }
 
 fn show_object(ui: &mut egui::Ui, objects: &ObjectTree, id: ObjectId) {
@@ -67,19 +67,19 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let dt = ctx.input(|i| i.stable_dt) as f32;
 
-        if self.play && self.current_time < self.total_time {
+        if self.play && self.current_time < self.scene.length {
             self.current_time += dt;
         }
 
-        if self.current_time >= self.total_time {
+        if self.current_time >= self.scene.length {
             self.play = false;
-            self.current_time = self.total_time;
+            self.current_time = self.scene.length;
         }
 
         ctx.request_repaint();
 
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            if self.current_time >= self.total_time {
+            if self.current_time >= self.scene.length {
                 self.current_time = 0.0;
                 self.play = true;
             } else {
@@ -121,7 +121,7 @@ impl eframe::App for App {
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                 ui.add(
-                    egui::Slider::new(&mut self.current_time, 0.0..=self.total_time)
+                    egui::Slider::new(&mut self.current_time, 0.0..=self.scene.length)
                         .clamp_to_range(true),
                 );
 
@@ -129,7 +129,20 @@ impl eframe::App for App {
                     let rect = ui.available_rect_before_wrap();
                     let response = ui.allocate_rect(rect, egui::Sense::drag());
 
+                    let boxes = objects.bounding_boxes();
+
                     self.renderer.paint_at(ui, rect, objects);
+
+                    if false {
+                        let bb_canvas = ui.painter_at(rect);
+                        for (id, bb) in boxes {
+                            bb_canvas.rect_stroke(
+                                bb.translate(rect.center().to_vec2()),
+                                0.0,
+                                Stroke::new(1.0, Color32::RED),
+                            );
+                        }
+                    }
                 });
             });
         });
@@ -145,7 +158,6 @@ impl App {
             renderer,
             play: true,
             current_time: 0.0,
-            total_time: 2.5,
         }
     }
 }
@@ -158,20 +170,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut scene_builder = SceneBuilder::new(5.0);
 
-    scene_builder
-        .line(
-            pos2(0.0, 0.0),
-            pos2(0.0, 100.0),
-            10.0,
-            Color32::GREEN.into(),
-        )
-        .add();
+    let size = Vec2::new(500.0, 500.0);
 
-    let grid = scene_builder
-        .build(Grid::new(10, 1.0, Vec2::new(100.0, 100.0), Color32::GREEN))
-        .with_scale(10.0)
-        .add();
-    scene_builder.animate(grid, 0.5, |a| a.fade_in());
+    scene_builder.add_new_object(Object {
+        transform: Transform::default(),
+        object_kind: ObjectKind::Model(Model {
+            mesh: Mesh::make_triangle(),
+            material: Material {
+                color: Color32::RED,
+            },
+        }),
+    });
+
+    scene_builder
+        .circle(50.0, Color32::RED.into())
+        .with_position(pos2(-100.0, -100.0))
+        .with_anchor(pos2(50.0, 0.0))
+        .animate(0.3, |a| a.fade_in());
+
+    scene_builder.parallel(|p| {
+        for i in 0..9 {
+            p.sequence(|s| {
+                s.delay(0.1 * i as f32);
+                s.rect(50.0, 50.0, Color32::RED.into())
+                    .with_position(pos2(
+                        (i % 3) as f32 * 100.0 - 100.0,
+                        (i / 3) as f32 * 100.0 - 100.0,
+                    ))
+                    .animate(0.3, |a| a.fade_in());
+            });
+        }
+    });
 
     let scene = scene_builder.finish();
 
@@ -203,6 +232,7 @@ impl Grid {
 }
 
 impl Component for Grid {
+    type Handle = ();
     fn build(&self, builder: &mut impl Builder) {
         let mut pbuilder = Path::builder();
 

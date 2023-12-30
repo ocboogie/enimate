@@ -4,8 +4,9 @@ use crate::{
     builder::{Builder, BuilderState},
     motion::{self, AddObject, Keyframe, Motion, MotionId, Parallel, Trigger},
     object::{Object, ObjectId},
+    object_tree::ObjectTree,
     scene::Scene,
-    world::{ObjectTree, World},
+    world::World,
 };
 
 pub struct SceneBuilder {
@@ -19,17 +20,22 @@ impl SceneBuilder {
         }
     }
 
-    fn create_root_motion(&self) -> Box<dyn Motion> {
-        Box::new(Parallel::new(self.state.root_motions.clone()))
-    }
-
     pub fn finish(mut self) -> Scene {
-        let root = self.create_root_motion();
-        let root_id = rand::random::<usize>();
+        let parallel_id = rand::random::<usize>();
+        let parallel = Parallel::new(self.state.root_motions.clone());
+        self.state.motions.insert(parallel_id, Box::new(parallel));
 
-        self.state.motions.insert(root_id, root);
+        // let keyframe_id = rand::random::<usize>();
+        // let keyframe = Keyframe {
+        //     from_min: 0.0,
+        //     from_max: self.state.scene_length,
+        //     to_min: 0.0,
+        //     to_max: 1.0,
+        //     motion: parallel_id,
+        // };
+        // self.state.motions.insert(keyframe_id, Box::new(keyframe));
 
-        Scene::new(self.state.motions, root_id)
+        Scene::new(self.state.motions, parallel_id, self.state.scene_length)
     }
 }
 

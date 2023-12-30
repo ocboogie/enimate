@@ -5,13 +5,15 @@ use crate::{
     // component::{Component, ComponentBuilder},
     mesh::{Mesh, Vertex},
     motion::{
-        self, AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, Parallel, Trigger,
+        self, AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, NoOp, Parallel,
+        Trigger,
     },
     object::{Material, Object, ObjectId, ObjectKind, Transform},
+    object_tree::ObjectTree,
     scene_builder::SceneBuilder,
-    world::{ObjectTree, World},
+    world::World,
 };
-use egui::pos2;
+use egui::{pos2, vec2, Pos2, Rect};
 use lyon::{
     lyon_tessellation::{
         BuffersBuilder, FillGeometryBuilder, FillVertex, StrokeGeometryBuilder, StrokeOptions,
@@ -38,6 +40,100 @@ impl BuilderState {
             current_time: 0.0,
             scene_length,
         }
+    }
+}
+
+pub struct SequenceBuilder<'a, B: Builder> {
+    builder: &'a mut B,
+    motions: Vec<(f32, MotionId)>,
+}
+
+impl<'a, B: Builder> SequenceBuilder<'a, B> {
+    pub fn new(builder: &'a mut B) -> Self {
+        Self {
+            builder,
+            motions: Vec::new(),
+        }
+    }
+}
+
+impl<'a, B: Builder> Builder for SequenceBuilder<'a, B> {
+    fn state(&mut self) -> &mut BuilderState {
+        self.builder.state()
+    }
+}
+
+pub struct ParallelBuilder<'a, B: Builder> {
+    builder: &'a mut B,
+    motions: Vec<MotionId>,
+    max_duration: f32,
+}
+
+impl<'a, B: Builder> ParallelBuilder<'a, B> {
+    pub fn new(builder: &'a mut B) -> Self {
+        Self {
+            builder,
+            motions: Vec::new(),
+            max_duration: 0.0,
+        }
+    }
+
+    pub fn sequence(&mut self, builder: impl FnOnce(&mut SequenceBuilder<B>)) {
+        let start_time = self.builder.state().current_time;
+        let mut sequence_builder = SequenceBuilder::new(self.builder);
+
+        builder(&mut sequence_builder);
+
+        self.builder.state().current_time = start_time;
+    }
+}
+
+impl Builder for ParallelBuilder<'_, SceneBuilder> {
+    fn state(&mut self) -> &mut BuilderState {
+        self.builder.state()
+    }
+
+    fn add_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
+        let motion_id = self.regester_motion(motion);
+
+        self.motions.push(motion_id);
+
+        motion_id
+    }
+
+    fn play(&mut self, motion: Box<dyn Motion>) -> MotionId {
+        self.add_motion(motion)
+    }
+
+    fn play_for(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
+        let motion_id = self.regester_motion(motion);
+
+        let current_time = self.state().current_time;
+        let keyframe = Keyframe::new(current_time, current_time + duration, 0.0, 1.0, motion_id);
+
+        self.max_duration = self.max_duration.max(duration);
+        self.add_motion(Box::new(keyframe))
+    }
+}
+
+pub trait Positioner {
+    fn position(&self, source: ObjectId, state: &BuilderState) -> Pos2;
+}
+
+impl Positioner for Pos2 {
+    fn position(&self, _source: ObjectId, _state: &BuilderState) -> Pos2 {
+        *self
+    }
+}
+
+pub struct Left(pub ObjectId);
+
+impl Positioner for Left {
+    fn position(&self, source: ObjectId, state: &BuilderState) -> Pos2 {
+        let source_bb = state.objects.local_bounding_box(source);
+        let target_bb = state.objects.local_bounding_box(self.0);
+
+        target_bb.left_center() - vec2(source_bb.width() / 2.0, 0.0)
     }
 }
 
@@ -71,6 +167,21 @@ impl<'a, B: Builder> AnimationBuilder<'a, B> {
             self.object_id,
             self.object().transform,
             self.object().transform.with_position(end),
+        );
+        self.play(a)
+    }
+
+    // pub fn delay(self, duration: f32) -> Self {
+    //     self.builder.play_for(Box::new(NoOp), duration);
+    //     self
+    // }
+    //
+    pub fn move_to(mut self, pos: impl Positioner) -> Self {
+        let target_pos = pos.position(self.object_id, self.builder.state());
+        let a = AnimateTransform::new(
+            self.object_id,
+            self.object().transform,
+            self.object().transform.with_position(target_pos),
         );
         self.play(a)
     }
@@ -151,28 +262,40 @@ impl<'a, B: Builder> ObjectBuilder<'a, B> {
         self
     }
 
-    // pub fn with_animations(mut self, animation_creator: impl FnOnce(AnimationBuilder)) -> Self {
-    //     animation_creator(AnimationBuilder::new(
-    //         self.object_id,
-    //         self.builder.state().scene_length,
-    //         self.builder,
-    //     ));
-    // }
+    fn bounding_box(&mut self) -> Rect {
+        self.builder
+            .state()
+            .objects
+            .local_bounding_box_obj(&self.object)
+    }
+
+    pub fn with_centered_anchor(mut self) -> Self {
+        let bounding_box = self.bounding_box();
+
+        self.object.transform.position -= bounding_box.center().to_vec2();
+        self.object.transform.anchor = bounding_box.center();
+        self
+    }
 
     pub fn add(self) -> ObjectId {
         self.builder.add_object(self.object_id, self.object, true);
         self.object_id
     }
 
-    pub fn center_anchor(mut self) -> Self {
-        let bounds = match self.object.object_kind {
-            ObjectKind::Model(ref model) => model.mesh.bounds(),
-            ObjectKind::Group(_) => self.builder.state().objects.bounds(&self.object_id),
-        };
+    pub fn animate(
+        self,
+        duration: f32,
+        animation_creator: impl FnOnce(AnimationBuilder<B>) -> AnimationBuilder<B>,
+    ) -> ObjectId {
+        self.builder.add_object(self.object_id, self.object, true);
 
-        self.object.transform.position -= bounds.center().to_vec2();
-        self.object.transform.anchor = bounds.center();
-        self
+        let _ = animation_creator(AnimationBuilder::new(
+            self.object_id,
+            duration,
+            self.builder,
+        ));
+
+        self.object_id
     }
 }
 
@@ -203,19 +326,18 @@ impl<C: Component> Block for C {
 pub trait Builder: Sized {
     fn state(&mut self) -> &mut BuilderState;
 
-    fn add_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
-        let motion_id = rand::random::<usize>();
-
-        self.state().motions.insert(motion_id, motion);
-        self.state().root_motions.push(motion_id);
-
-        motion_id
-    }
-
     fn regester_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
         let motion_id = rand::random::<usize>();
 
         self.state().motions.insert(motion_id, motion);
+        motion_id
+    }
+
+    fn add_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
+        let motion_id = self.regester_motion(motion);
+
+        self.state().root_motions.push(motion_id);
+
         motion_id
     }
 
@@ -239,21 +361,10 @@ pub trait Builder: Sized {
         let motion_id = self.regester_motion(motion);
 
         let current_time = &mut self.state().current_time;
+        let keyframe = Keyframe::new(*current_time, *current_time + duration, 0.0, 1.0, motion_id);
+
         *current_time += duration;
-
-        let keyframe = Keyframe::new(0.0, 1.0, *current_time, *current_time + duration, motion_id);
         self.add_motion(Box::new(keyframe))
-    }
-
-    fn play_concurrently_for(&mut self, motions: Vec<Box<dyn Motion>>, duration: f32) -> MotionId {
-        let parallel = Parallel::new(
-            motions
-                .into_iter()
-                .map(|motion| self.regester_motion(motion))
-                .collect(),
-        );
-
-        self.play_for(Box::new(parallel), duration)
     }
 
     fn add_object(&mut self, id: ObjectId, object: Object, rooted: bool) {
@@ -277,6 +388,25 @@ pub trait Builder: Sized {
         animation_creator: impl FnOnce(AnimationBuilder<Self>) -> AnimationBuilder<Self>,
     ) {
         let _ = animation_creator(AnimationBuilder::new(object_id, duration, self));
+    }
+
+    fn parallel(&mut self, builder: impl FnOnce(&mut ParallelBuilder<Self>)) {
+        let mut parallel_builder = ParallelBuilder::new(self);
+
+        builder(&mut parallel_builder);
+
+        let parallel = Parallel::new(parallel_builder.motions);
+
+        if parallel_builder.max_duration == 0.0 {
+            self.play(Box::new(parallel));
+        } else {
+            let max_duration = parallel_builder.max_duration;
+            self.play_for(Box::new(parallel), max_duration);
+        }
+    }
+
+    fn delay(&mut self, duration: f32) {
+        self.play_for(Box::new(NoOp), duration);
     }
 
     fn build(&mut self, block: impl Block) -> ObjectBuilder<Self> {
@@ -342,7 +472,7 @@ pub trait Builder: Sized {
         }
     }
 
-    fn circle(&mut self, x: f32, y: f32, radius: f32, material: Material) -> ObjectBuilder<Self> {
+    fn circle(&mut self, radius: f32, material: Material) -> ObjectBuilder<Self> {
         let mesh = self.tessellate(|mut tessellator, buffers_builder| {
             tessellator
                 .tessellate_circle(
@@ -354,10 +484,7 @@ pub trait Builder: Sized {
                 .unwrap();
         });
 
-        let object = Object::new_model(mesh, material).with_transform(Transform {
-            position: pos2(x, y),
-            ..Default::default()
-        });
+        let object = Object::new_model(mesh, material);
 
         ObjectBuilder::new(object, self)
     }
@@ -381,6 +508,25 @@ pub trait Builder: Sized {
                 .tessellate_path(
                     &path,
                     &StrokeOptions::default().with_line_width(width),
+                    buffers_builder,
+                )
+                .unwrap();
+        });
+
+        let object = Object::new_model(mesh, material);
+
+        ObjectBuilder::new(object, self)
+    }
+
+    fn rect(&mut self, width: f32, height: f32, material: Material) -> ObjectBuilder<Self> {
+        let mesh = self.tessellate(|mut tessellator, buffers_builder| {
+            tessellator
+                .tessellate_rectangle(
+                    &lyon::math::Box2D::new(
+                        lyon::math::point(-width / 2.0, -height / 2.0),
+                        lyon::math::point(width / 2.0, height / 2.0),
+                    ),
+                    &FillOptions::default(),
                     buffers_builder,
                 )
                 .unwrap();

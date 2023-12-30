@@ -39,7 +39,7 @@ fn vs_main(
 
     let pos = camera.view_proj * translated_pos;
 
-    out.clip_position = vec4<f32>(pos, 1.0, 1.0);
+    out.clip_position = vec4<f32>(pos, 0.0, 1.0);
     return out;
 }
 

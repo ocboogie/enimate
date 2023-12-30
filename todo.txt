@@ -5,3 +5,5 @@
  - Add debugging tech like outlines and wireframes (perhaps in the shader)
  - Make motions more efficient by using references for their objects 
    and have the Motion trait have a lifetime
+ - Root motions should not be in builder state 
+   - Actually should probably refactor the whole thing

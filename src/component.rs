@@ -4,10 +4,11 @@ use crate::{
     builder::{Builder, BuilderState},
     motion::Motion,
     object::{Object, ObjectId},
+    object_tree::ObjectTree,
     scene_builder::SceneBuilder,
-    world::ObjectTree,
 };
 
 pub trait Component {
-    fn build(&self, builder: &mut impl Builder);
+    type Handle;
+    fn build(&self, builder: &mut impl Builder) -> Self::Handle;
 }

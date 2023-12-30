@@ -2,17 +2,23 @@ use std::collections::HashMap;
 
 use crate::{
     motion::{Motion, MotionId},
-    world::{ObjectTree, World},
+    object_tree::ObjectTree,
+    world::World,
 };
 
 pub struct Scene {
     pub root: MotionId,
     pub motions: HashMap<MotionId, Box<dyn Motion>>,
+    pub length: f32,
 }
 
 impl Scene {
-    pub fn new(motions: HashMap<MotionId, Box<dyn Motion>>, root: MotionId) -> Self {
-        Self { root, motions }
+    pub fn new(motions: HashMap<MotionId, Box<dyn Motion>>, root: MotionId, length: f32) -> Self {
+        Self {
+            root,
+            motions,
+            length,
+        }
     }
 
     pub fn root(&self) -> &Box<dyn Motion> {

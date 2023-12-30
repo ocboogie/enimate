@@ -4,7 +4,7 @@ use crate::motion_ui::MotionUi;
 use crate::object::{Object, ObjectKind};
 use crate::scene::Scene;
 use crate::world::World;
-use crate::{object::Transform, world::ObjectTree};
+use crate::{object::Transform, object_tree::ObjectTree};
 
 pub type MotionId = usize;
 
@@ -15,10 +15,32 @@ pub trait Motion: MotionUi {
     fn animate(&self, world: &mut World);
 }
 
-pub struct Noop;
+pub struct NoOp;
 
-impl Motion for Noop {
+impl Motion for NoOp {
     fn animate(&self, _world: &mut World) {}
+}
+
+pub struct Sequence {
+    pub motions: Vec<(f32, MotionId)>,
+}
+
+impl Sequence {
+    /// All the durations must add up to 1.0.
+    pub fn new(motions: Vec<(f32, MotionId)>) -> Self {
+        Self { motions }
+    }
+}
+
+impl Motion for Sequence {
+    fn animate(&self, world: &mut World) {
+        let mut time = 0.0;
+
+        for (duration, motion) in &self.motions {
+            world.play_at(*motion, ((world.time - time) / duration).min(1.0).max(0.0));
+            time += duration;
+        }
+    }
 }
 
 pub struct Parallel {
@@ -180,23 +202,60 @@ impl Motion for FadeIn {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     struct ExpectTime(f32);
 
+    impl MotionUi for ExpectTime {
+        fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {}
+    }
+
     impl Motion for ExpectTime {
-        fn animate(&self, world: &mut ObjectTree, time: f32) {
-            assert_eq!(self.0, time);
+        fn animate(&self, world: &mut World) {
+            assert_eq!(self.0, world.time);
         }
+    }
+
+    fn add_motion(
+        motions: &mut HashMap<MotionId, Box<dyn Motion>>,
+        motion: impl Motion + 'static,
+    ) -> MotionId {
+        let id = rand::random::<usize>();
+        motions.insert(id, Box::new(motion));
+        id
     }
 
     #[test]
     fn test_keyframe() {
-        let mut world = ObjectTree::default();
+        let mut world = World::new(0.0, &mut ObjectTree::new(), &HashMap::new());
 
-        Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.0))).animate(&mut world, 0.0);
-        Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 0.5);
-        Keyframe::new(0.0, 1.0, 1.0, 2.0, Box::new(ExpectTime(1.5))).animate(&mut world, 0.5);
-        Keyframe::new(5.0, 10.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 7.0);
+        // Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.0))).animate(&mut world, 0.0);
+        // Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 0.5);
+        // Keyframe::new(0.0, 1.0, 1.0, 2.0, Box::new(ExpectTime(1.5))).animate(&mut world, 0.5);
+        // Keyframe::new(5.0, 10.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 7.0);
+    }
+
+    #[test]
+    fn test_sequence() {
+        let motions = &mut HashMap::new();
+        let expect_time = add_motion(motions, ExpectTime(1.0));
+        let expect_time_2 = add_motion(motions, ExpectTime(1.0));
+        let expect_time_3 = add_motion(motions, ExpectTime(0.5));
+        let seq = add_motion(
+            motions,
+            Sequence::new(vec![
+                (0.5, expect_time),
+                (0.25, expect_time_2),
+                (0.25, expect_time_3),
+            ]),
+        );
+
+        let mut tree = ObjectTree::new();
+
+        let mut world = World::new(0.0, &mut tree, &motions);
+
+        world.play_at(seq, 0.875);
     }
 }

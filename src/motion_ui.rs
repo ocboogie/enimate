@@ -1,6 +1,7 @@
 use crate::{
     motion::{
-        AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, Noop, Parallel, Trigger,
+        AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, NoOp, Parallel, Sequence,
+        Trigger,
     },
     scene::Scene,
 };
@@ -26,14 +27,28 @@ impl MotionUi for Parallel {
     }
 }
 
+impl MotionUi for Sequence {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
+        ui.label("Sequence");
+        ui.indent("Sequence", |ui| {
+            for (duration, id) in &mut self.motions {
+                ui.horizontal(|ui| {
+                    ui.add(egui::Slider::new(duration, 0.0..=1.0).text("Duration"));
+                    fixme(ui, scene, *id);
+                });
+            }
+        });
+    }
+}
+
 impl MotionUi for Keyframe {
     fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
         ui.label("Keyframe");
         ui.indent("Keyframe", |ui| {
-            ui.add(egui::Slider::new(&mut self.from_min, 0.0..=1.0).text("From Min"));
-            ui.add(egui::Slider::new(&mut self.from_max, 0.0..=1.0).text("From Max"));
-            ui.add(egui::Slider::new(&mut self.to_min, 0.0..=1.0).text("To Min"));
-            ui.add(egui::Slider::new(&mut self.to_max, 0.0..=1.0).text("To Max"));
+            ui.add(egui::Slider::new(&mut self.from_min, 0.0..=500.0).text("From Min"));
+            ui.add(egui::Slider::new(&mut self.from_max, 0.0..=500.0).text("From Max"));
+            ui.add(egui::Slider::new(&mut self.to_min, 0.0..=500.0).text("To Min"));
+            ui.add(egui::Slider::new(&mut self.to_max, 0.0..=500.0).text("To Max"));
             fixme(ui, scene, self.motion);
         });
     }
@@ -43,7 +58,7 @@ impl MotionUi for Trigger {
     fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
         ui.label("Trigger");
         ui.indent("Trigger", |ui| {
-            ui.add(egui::Slider::new(&mut self.time, 0.0..=1.0).text("Time"));
+            ui.add(egui::Slider::new(&mut self.time, 0.0..=500.0).text("Time"));
             fixme(ui, scene, self.motion);
         });
     }
@@ -107,7 +122,7 @@ impl MotionUi for AnimateTransform {
     }
 }
 
-impl MotionUi for Noop {
+impl MotionUi for NoOp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
         ui.label("Noop");
     }

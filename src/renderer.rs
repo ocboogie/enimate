@@ -1,6 +1,6 @@
 use crate::mesh::Vertex;
 use crate::object::{Material, ObjectId, Transform};
-use crate::world::{ObjectTree, RenderObject};
+use crate::object_tree::{ObjectTree, RenderObject};
 use eframe::wgpu::ColorTargetState;
 use eframe::{
     egui_wgpu::{self, wgpu},
@@ -204,13 +204,15 @@ impl egui_wgpu::CallbackTrait for RendererCallback {
 
 impl Renderer {
     pub fn paint_at(&mut self, ui: &mut egui::Ui, rect: Rect, world: ObjectTree) {
+        let render_size = rect.size() / ui.ctx().pixels_per_point();
+
         ui.painter_at(rect)
             .add(egui_wgpu::Callback::new_paint_callback(
                 rect,
                 RendererCallback {
                     id: self.id,
                     world,
-                    render_size: rect.size(),
+                    render_size,
                 },
             ));
     }
@@ -352,7 +354,10 @@ impl RendererResources {
         queue.write_buffer(
             &self.camera_buffer,
             0,
-            bytemuck::cast_slice(&vec![1.0 / render_size.x, 0.0, 0.0, 1.0 / render_size.y]),
+            // Since we are using a 2D orthographic camera, we can just use a 2x2 matrix.
+            // Also, we want the origin to be at the top left corner, so we need to flip
+            // the y axis, since NDC has the origin at the bottom left corner.
+            bytemuck::cast_slice(&vec![1.0 / render_size.x, 0.0, 0.0, -1.0 / render_size.y]),
         );
 
         // FIXME: Bad performance, since it is updating the entire buffer every

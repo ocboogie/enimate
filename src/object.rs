@@ -1,5 +1,5 @@
 use crate::mesh::Mesh;
-use egui::{pos2, Color32, Pos2};
+use egui::{pos2, Color32, Pos2, Rect};
 
 #[derive(Clone, Default, Debug)]
 pub struct Material {
@@ -57,6 +57,38 @@ impl Transform {
         }
     }
 
+    pub fn map_aabb(&self, rect: Rect) -> Rect {
+        let top_left = self.apply(rect.min);
+        let top_right = self.apply(pos2(rect.max.x, rect.min.y));
+        let bottom_left = self.apply(pos2(rect.min.x, rect.max.y));
+        let bottom_right = self.apply(rect.max);
+
+        // TODO: There is probably a better way to do this.
+        let min_x = top_left
+            .x
+            .min(top_right.x)
+            .min(bottom_left.x)
+            .min(bottom_right.x);
+        let min_y = top_left
+            .y
+            .min(top_right.y)
+            .min(bottom_left.y)
+            .min(bottom_right.y);
+
+        let max_x = top_left
+            .x
+            .max(top_right.x)
+            .max(bottom_left.x)
+            .max(bottom_right.x);
+        let max_y = top_left
+            .y
+            .max(top_right.y)
+            .max(bottom_left.y)
+            .max(bottom_right.y);
+
+        Rect::from_min_max(pos2(min_x, min_y), pos2(max_x, max_y))
+    }
+
     pub fn with_position(&self, position: Pos2) -> Self {
         let mut new = self.clone();
         new.position = position;
@@ -96,7 +128,6 @@ pub type ObjectId = usize;
 pub enum ObjectKind {
     Model(Model),
     Group(Vec<ObjectId>),
-    // Scene,
 }
 
 #[derive(Clone, Debug)]
