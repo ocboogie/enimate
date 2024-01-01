@@ -6,11 +6,10 @@ use crate::{
     mesh::{Mesh, Vertex},
     motion::{
         self, AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, NoOp, Parallel,
-        Trigger,
+        Sequence, Trigger,
     },
     object::{Material, Object, ObjectId, ObjectKind, Transform},
     object_tree::ObjectTree,
-    scene_builder::SceneBuilder,
     world::World,
 };
 use egui::{pos2, vec2, Pos2, Rect};
@@ -25,9 +24,7 @@ use lyon::{
 
 pub struct BuilderState {
     pub motions: HashMap<MotionId, Box<dyn Motion>>,
-    pub root_motions: Vec<MotionId>,
     pub objects: ObjectTree,
-    pub current_time: f32,
     pub scene_length: f32,
 }
 
@@ -35,84 +32,40 @@ impl BuilderState {
     pub fn new(scene_length: f32) -> Self {
         Self {
             motions: HashMap::new(),
-            root_motions: Vec::new(),
             objects: ObjectTree::new(),
-            current_time: 0.0,
             scene_length,
         }
     }
-}
 
-pub struct SequenceBuilder<'a, B: Builder> {
-    builder: &'a mut B,
-    motions: Vec<(f32, MotionId)>,
-}
+    pub fn emulate_motion(&mut self, motion: &dyn Motion) {
+        // Run the motion, so the state of objects is consistent with the end of the motion.
+        let world = &mut World::new(1.0, &mut self.objects, &self.motions);
+        motion.animate(world);
+    }
 
-impl<'a, B: Builder> SequenceBuilder<'a, B> {
-    pub fn new(builder: &'a mut B) -> Self {
-        Self {
-            builder,
-            motions: Vec::new(),
-        }
+    pub fn normalize_time(&self, time: f32) -> f32 {
+        time / self.scene_length
     }
 }
 
-impl<'a, B: Builder> Builder for SequenceBuilder<'a, B> {
-    fn state(&mut self) -> &mut BuilderState {
-        self.builder.state()
-    }
-}
-
-pub struct ParallelBuilder<'a, B: Builder> {
-    builder: &'a mut B,
+pub struct ParallelBuilder<'a> {
+    state: &'a mut BuilderState,
     motions: Vec<MotionId>,
-    max_duration: f32,
+    duration: f32,
 }
 
-impl<'a, B: Builder> ParallelBuilder<'a, B> {
-    pub fn new(builder: &'a mut B) -> Self {
-        Self {
-            builder,
-            motions: Vec::new(),
-            max_duration: 0.0,
-        }
-    }
-
-    pub fn sequence(&mut self, builder: impl FnOnce(&mut SequenceBuilder<B>)) {
-        let start_time = self.builder.state().current_time;
-        let mut sequence_builder = SequenceBuilder::new(self.builder);
-
-        builder(&mut sequence_builder);
-
-        self.builder.state().current_time = start_time;
-    }
-}
-
-impl Builder for ParallelBuilder<'_, SceneBuilder> {
+impl<'a> Builder for ParallelBuilder<'a> {
     fn state(&mut self) -> &mut BuilderState {
-        self.builder.state()
+        &mut self.state
     }
 
-    fn add_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
-        let motion_id = self.regester_motion(motion);
+    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
+        let motion_id = self.add_motion(motion);
 
         self.motions.push(motion_id);
+        self.duration = self.duration.max(duration);
 
         motion_id
-    }
-
-    fn play(&mut self, motion: Box<dyn Motion>) -> MotionId {
-        self.add_motion(motion)
-    }
-
-    fn play_for(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
-        let motion_id = self.regester_motion(motion);
-
-        let current_time = self.state().current_time;
-        let keyframe = Keyframe::new(current_time, current_time + duration, 0.0, 1.0, motion_id);
-
-        self.max_duration = self.max_duration.max(duration);
-        self.add_motion(Box::new(keyframe))
     }
 }
 
@@ -138,28 +91,23 @@ impl Positioner for Left {
 }
 
 #[must_use]
-pub struct AnimationBuilder<'a, B: Builder> {
+pub struct AnimationBuilder<'a> {
     object_id: ObjectId,
-    duration: f32,
-    builder: &'a mut B,
+    animations: Vec<Box<dyn Motion>>,
+    state: &'a BuilderState,
 }
 
-impl<'a, B: Builder> AnimationBuilder<'a, B> {
-    fn new(object_id: ObjectId, duration: f32, builder: &'a mut B) -> Self {
+impl<'a> AnimationBuilder<'a> {
+    fn new(object_id: ObjectId, state: &'a BuilderState) -> Self {
         Self {
             object_id,
-            duration,
-            builder,
+            animations: Vec::new(),
+            state,
         }
     }
 
     fn object(&mut self) -> &Object {
-        self.builder.state().objects.get(&self.object_id).unwrap()
-    }
-
-    fn play(self, motion: impl Motion + 'static) -> Self {
-        self.builder.play_for(Box::new(motion), self.duration);
-        self
+        self.state.objects.get(&self.object_id).unwrap()
     }
 
     pub fn translate(mut self, end: egui::Pos2) -> Self {
@@ -168,55 +116,53 @@ impl<'a, B: Builder> AnimationBuilder<'a, B> {
             self.object().transform,
             self.object().transform.with_position(end),
         );
-        self.play(a)
+        self.animations.push(Box::new(a));
+        self
     }
 
     // pub fn delay(self, duration: f32) -> Self {
     //     self.builder.play_for(Box::new(NoOp), duration);
     //     self
     // }
-    //
+
     pub fn move_to(mut self, pos: impl Positioner) -> Self {
-        let target_pos = pos.position(self.object_id, self.builder.state());
+        let target_pos = pos.position(self.object_id, self.state);
         let a = AnimateTransform::new(
             self.object_id,
             self.object().transform,
             self.object().transform.with_position(target_pos),
         );
-        self.play(a)
+        self.animations.push(Box::new(a));
+
+        self
     }
 
     pub fn rotate(mut self, rotation: f32) -> Self {
-        let a = AnimateTransform::new(
+        let a = Box::new(AnimateTransform::new(
             self.object_id,
             self.object().transform,
             self.object().transform.with_rotation(rotation),
-        );
-        self.play(a)
+        ));
+        self.animations.push(a);
+        self
     }
 
     pub fn scale(mut self, scale: f32) -> Self {
-        let a = AnimateTransform::new(
+        let a = Box::new(AnimateTransform::new(
             self.object_id,
             self.object().transform,
             self.object().transform.with_scale(scale),
-        );
-        self.play(a)
+        ));
+        self.animations.push(a);
+        self
     }
 
-    pub fn fade_in(self) -> Self {
-        let a = FadeIn {
+    pub fn fade_in(mut self) -> Self {
+        self.animations.push(Box::new(FadeIn {
             object_id: self.object_id,
-        };
-        self.play(a)
+        }));
+        self
     }
-
-    // pub fn add(self) -> ObjectId {
-    //     self.builder.add_object(self.object_id, self.object, true);
-    //     // self.builder
-    //     //     .add_animation(Box::new(motion::Parallel::new(self.animations)));
-    //     self.object_id
-    // }
 }
 
 #[must_use]
@@ -278,24 +224,25 @@ impl<'a, B: Builder> ObjectBuilder<'a, B> {
     }
 
     pub fn add(self) -> ObjectId {
-        self.builder.add_object(self.object_id, self.object, true);
+        self.builder.add_object(self.object_id, self.object);
         self.object_id
     }
 
     pub fn animate(
         self,
         duration: f32,
-        animation_creator: impl FnOnce(AnimationBuilder<B>) -> AnimationBuilder<B>,
+        animation_creator: impl FnOnce(AnimationBuilder) -> AnimationBuilder,
     ) -> ObjectId {
-        self.builder.add_object(self.object_id, self.object, true);
+        self.builder.add_object(self.object_id, self.object);
 
-        let _ = animation_creator(AnimationBuilder::new(
-            self.object_id,
-            duration,
-            self.builder,
-        ));
+        self.builder
+            .animate(self.object_id, duration, animation_creator);
 
         self.object_id
+        //
+        // let _ = animation_creator(AnimationBuilder::new(self.object_id, self.builder.state()));
+        //
+        // self.object_id
     }
 }
 
@@ -309,113 +256,129 @@ impl Block for Object {
         self
     }
 }
-
-impl<C: Component> Block for C {
-    fn root(self, builder: &mut impl Builder) -> Object {
-        let mut group_builder = GroupBuilder {
-            builder,
-            children: Vec::new(),
-        };
-
-        self.build(&mut group_builder);
-
-        Object::new_group(group_builder.children)
-    }
-}
+//
+// impl<C: Component> Block for C {
+//     fn root(self, builder: &mut impl Builder) -> Object {
+//         let mut group_builder = GroupBuilder {
+//             builder,
+//             children: Vec::new(),
+//         };
+//
+//         self.build(&mut group_builder);
+//
+//         Object::new_group(group_builder.children)
+//     }
+// }
 
 pub trait Builder: Sized {
     fn state(&mut self) -> &mut BuilderState;
+    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId;
+    // Wheather new objects should be added to the root of the object tree.
+    fn rooted(&mut self) -> bool {
+        true
+    }
 
-    fn regester_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
-        let motion_id = rand::random::<usize>();
-
-        self.state().motions.insert(motion_id, motion);
-        motion_id
+    fn regester_motion(&mut self, id: usize, motion: Box<dyn Motion>) {
+        self.state().motions.insert(id, motion);
     }
 
     fn add_motion(&mut self, motion: Box<dyn Motion>) -> MotionId {
-        let motion_id = self.regester_motion(motion);
-
-        self.state().root_motions.push(motion_id);
-
+        let motion_id = rand::random::<usize>();
+        self.regester_motion(motion_id, motion);
         motion_id
     }
 
-    fn emulate_motion(&mut self, motion: &dyn Motion) {
-        let state = self.state();
-        // Run the motion, so the state of objects is consistent with the end of the motion.
-        let world = &mut World::new(1.0, &mut state.objects, &state.motions);
-        motion.animate(world);
-    }
-
-    fn play(&mut self, motion: Box<dyn Motion>) -> MotionId {
-        self.emulate_motion(motion.as_ref());
-        let motion_id = self.regester_motion(motion);
-
-        let trigger = Trigger::new(self.state().current_time, motion_id);
-        self.add_motion(Box::new(trigger))
-    }
-
-    fn play_for(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
-        self.emulate_motion(motion.as_ref());
-        let motion_id = self.regester_motion(motion);
-
-        let current_time = &mut self.state().current_time;
-        let keyframe = Keyframe::new(*current_time, *current_time + duration, 0.0, 1.0, motion_id);
-
-        *current_time += duration;
-        self.add_motion(Box::new(keyframe))
-    }
-
-    fn add_object(&mut self, id: ObjectId, object: Object, rooted: bool) {
-        self.play(Box::new(AddObject {
+    fn add_object(&mut self, id: ObjectId, object: Object) {
+        let rooted = self.rooted();
+        let add_object = AddObject {
             object_id: id,
             object,
             rooted,
-        }));
+        };
+        self.play(Box::new(add_object), 0.0);
     }
 
+    // Same as add_object, but generates a random id.
     fn add_new_object(&mut self, object: Object) -> ObjectId {
-        let id = rand::random::<usize>();
-        self.add_object(id, object, true);
-        id
+        let object_id = rand::random::<ObjectId>();
+        self.add_object(object_id, object);
+        object_id
     }
 
     fn animate(
         &mut self,
         object_id: ObjectId,
         duration: f32,
-        animation_creator: impl FnOnce(AnimationBuilder<Self>) -> AnimationBuilder<Self>,
+        animation_creator: impl FnOnce(AnimationBuilder) -> AnimationBuilder,
     ) {
-        let _ = animation_creator(AnimationBuilder::new(object_id, duration, self));
-    }
+        let animation_builder = animation_creator(AnimationBuilder::new(object_id, self.state()));
 
-    fn parallel(&mut self, builder: impl FnOnce(&mut ParallelBuilder<Self>)) {
-        let mut parallel_builder = ParallelBuilder::new(self);
+        // self.play(Box::new(Parallel { motions: ids }), duration);
 
-        builder(&mut parallel_builder);
-
-        let parallel = Parallel::new(parallel_builder.motions);
-
-        if parallel_builder.max_duration == 0.0 {
-            self.play(Box::new(parallel));
+        if animation_builder.animations.len() == 1 {
+            let animation = animation_builder.animations.into_iter().next().unwrap();
+            self.play(animation, duration);
         } else {
-            let max_duration = parallel_builder.max_duration;
-            self.play_for(Box::new(parallel), max_duration);
+            let ids = animation_builder
+                .animations
+                .into_iter()
+                .map(|animation| self.add_motion(animation))
+                .collect();
+
+            self.play(Box::new(Parallel { motions: ids }), duration);
         }
     }
 
+    fn sequence(&mut self, builder: impl FnOnce(&mut SequenceBuilder)) {
+        let mut sequence_builder = SequenceBuilder {
+            state: self.state(),
+            motions: Vec::new(),
+        };
+
+        builder(&mut sequence_builder);
+
+        let duration = sequence_builder
+            .motions
+            .iter()
+            .map(|(duration, _)| duration)
+            .sum();
+
+        let sequence = Sequence {
+            motions: sequence_builder.motions,
+        };
+
+        self.play(Box::new(sequence), duration);
+    }
+
+    fn parallel(&mut self, builder: impl FnOnce(&mut ParallelBuilder)) {
+        let mut parallel_builder = ParallelBuilder {
+            state: self.state(),
+            motions: Vec::new(),
+            duration: 0.0,
+        };
+
+        builder(&mut parallel_builder);
+
+        let sequence = Parallel {
+            motions: parallel_builder.motions,
+        };
+
+        let duration = parallel_builder.duration;
+
+        self.play(Box::new(sequence), duration);
+    }
+
     fn delay(&mut self, duration: f32) {
-        self.play_for(Box::new(NoOp), duration);
+        self.play(Box::new(NoOp), duration);
     }
 
-    fn build(&mut self, block: impl Block) -> ObjectBuilder<Self> {
-        ObjectBuilder::new(block.root(self), self)
-    }
-
-    fn add(&mut self, block: impl Block) -> ObjectId {
-        self.build(block).add()
-    }
+    // fn build(&mut self, block: impl Block) -> ObjectBuilder<Self> {
+    //     ObjectBuilder::new(block.root(self), self)
+    // }
+    //
+    // fn add(&mut self, block: impl Block) -> ObjectId {
+    //     self.build(block).add()
+    // }
 
     fn group(&mut self, child_creator: impl FnOnce(GroupBuilder<Self>) -> GroupBuilder<Self>) {
         let group_builder = child_creator(GroupBuilder {
@@ -554,9 +517,37 @@ pub trait Builder: Sized {
     }
 }
 
+pub struct SequenceBuilder<'a> {
+    pub state: &'a mut BuilderState,
+    pub motions: Vec<(f32, MotionId)>,
+}
+
+impl Builder for SequenceBuilder<'_> {
+    fn state(&mut self) -> &mut BuilderState {
+        self.state
+    }
+
+    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
+        let motion_id = self.add_motion(motion);
+
+        self.motions.push((duration, motion_id));
+
+        motion_id
+    }
+}
+
 pub struct GroupBuilder<'a, B: Builder> {
     builder: &'a mut B,
     pub children: Vec<ObjectId>,
+}
+
+impl<'a, B: Builder> GroupBuilder<'a, B> {
+    pub fn new(builder: &'a mut B, rooted: bool) -> Self {
+        Self {
+            builder,
+            children: Vec::new(),
+        }
+    }
 }
 
 impl<'a, B: Builder> Builder for GroupBuilder<'a, B> {
@@ -564,10 +555,11 @@ impl<'a, B: Builder> Builder for GroupBuilder<'a, B> {
         self.builder.state()
     }
 
-    fn add_object(&mut self, id: ObjectId, object: Object, rooted: bool) {
-        if rooted {
-            self.children.push(id);
-        }
-        self.builder.add_object(id, object, false);
+    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
+        self.builder.play(motion, duration)
+    }
+
+    fn rooted(&mut self) -> bool {
+        false
     }
 }

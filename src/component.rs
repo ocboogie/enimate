@@ -5,7 +5,6 @@ use crate::{
     motion::Motion,
     object::{Object, ObjectId},
     object_tree::ObjectTree,
-    scene_builder::SceneBuilder,
 };
 
 pub trait Component {

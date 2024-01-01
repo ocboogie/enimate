@@ -22,14 +22,8 @@ impl Motion for NoOp {
 }
 
 pub struct Sequence {
-    pub motions: Vec<(f32, MotionId)>,
-}
-
-impl Sequence {
     /// All the durations must add up to 1.0.
-    pub fn new(motions: Vec<(f32, MotionId)>) -> Self {
-        Self { motions }
-    }
+    pub motions: Vec<(f32, MotionId)>,
 }
 
 impl Motion for Sequence {
@@ -44,14 +38,8 @@ impl Motion for Sequence {
 }
 
 pub struct Parallel {
-    pub motions: Vec<MotionId>,
-}
-
-impl Parallel {
     /// Order matters!
-    pub fn new(motions: Vec<MotionId>) -> Self {
-        Self { motions }
-    }
+    pub motions: Vec<MotionId>,
 }
 
 impl Motion for Parallel {

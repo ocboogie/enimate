@@ -32,10 +32,8 @@ impl MotionUi for Sequence {
         ui.label("Sequence");
         ui.indent("Sequence", |ui| {
             for (duration, id) in &mut self.motions {
-                ui.horizontal(|ui| {
-                    ui.add(egui::Slider::new(duration, 0.0..=1.0).text("Duration"));
-                    fixme(ui, scene, *id);
-                });
+                ui.label(format!("Duration: {}", duration));
+                fixme(ui, scene, *id);
             }
         });
     }

@@ -172,22 +172,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let size = Vec2::new(500.0, 500.0);
 
-    scene_builder.add_new_object(Object {
-        transform: Transform::default(),
-        object_kind: ObjectKind::Model(Model {
-            mesh: Mesh::make_triangle(),
-            material: Material {
-                color: Color32::RED,
-            },
-        }),
-    });
+    // let obj = scene_builder
+    //     .circle(50.0, Color32::RED.into())
+    //     .with_position(pos2(-100.0, -100.0))
+    //     .with_anchor(pos2(50.0, 0.0))
+    //     .add();
 
-    scene_builder
-        .circle(50.0, Color32::RED.into())
-        .with_position(pos2(-100.0, -100.0))
-        .with_anchor(pos2(50.0, 0.0))
-        .animate(0.3, |a| a.fade_in());
-
+    // scene_builder.animate(obj, 1.0, |a| a.fade_in());
     scene_builder.parallel(|p| {
         for i in 0..9 {
             p.sequence(|s| {
