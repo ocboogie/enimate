@@ -1,7 +1,7 @@
 use eframe::egui_wgpu::wgpu;
 use egui::{pos2, Pos2, Rect};
 
-use crate::object::Transform;
+
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]

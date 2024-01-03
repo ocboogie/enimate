@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use crate::{
-    builder::{Builder, BuilderState},
-    motion::{Keyframe, Motion, MotionId, Parallel, Sequence},
+    building::{Builder, BuilderState},
+    motion::{Keyframe, Motion, MotionId, Sequence},
     object::ObjectId,
     scene::Scene,
 };

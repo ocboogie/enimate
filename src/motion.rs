@@ -2,9 +2,9 @@ use egui::Color32;
 
 use crate::motion_ui::MotionUi;
 use crate::object::{Object, ObjectKind};
-use crate::scene::Scene;
+
+use crate::object::Transform;
 use crate::world::World;
-use crate::{object::Transform, object_tree::ObjectTree};
 
 pub type MotionId = usize;
 
@@ -117,16 +117,6 @@ pub struct AnimateTransform {
     pub to: Transform,
 }
 
-impl AnimateTransform {
-    pub fn new(object_id: usize, from: Transform, to: Transform) -> Self {
-        Self {
-            object_id,
-            from,
-            to,
-        }
-    }
-}
-
 impl Motion for AnimateTransform {
     fn animate(&self, world: &mut World) {
         let object = world.objects.get_mut(&self.object_id).unwrap();
@@ -190,6 +180,8 @@ impl Motion for FadeIn {
 
 #[cfg(test)]
 mod tests {
+    use crate::object_tree::ObjectTree;
+    use crate::scene::Scene;
     use std::collections::HashMap;
 
     use super::*;
@@ -197,7 +189,7 @@ mod tests {
     struct ExpectTime(f32);
 
     impl MotionUi for ExpectTime {
-        fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {}
+        fn ui(&mut self, _ui: &mut egui::Ui, _scene: &mut Scene) {}
     }
 
     impl Motion for ExpectTime {
@@ -216,16 +208,6 @@ mod tests {
     }
 
     #[test]
-    fn test_keyframe() {
-        let mut world = World::new(0.0, &mut ObjectTree::new(), &HashMap::new());
-
-        // Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.0))).animate(&mut world, 0.0);
-        // Keyframe::new(0.0, 1.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 0.5);
-        // Keyframe::new(0.0, 1.0, 1.0, 2.0, Box::new(ExpectTime(1.5))).animate(&mut world, 0.5);
-        // Keyframe::new(5.0, 10.0, 0.0, 1.0, Box::new(ExpectTime(0.5))).animate(&mut world, 7.0);
-    }
-
-    #[test]
     fn test_sequence() {
         let motions = &mut HashMap::new();
         let expect_time = add_motion(motions, ExpectTime(1.0));
@@ -233,11 +215,13 @@ mod tests {
         let expect_time_3 = add_motion(motions, ExpectTime(0.5));
         let seq = add_motion(
             motions,
-            Sequence::new(vec![
-                (0.5, expect_time),
-                (0.25, expect_time_2),
-                (0.25, expect_time_3),
-            ]),
+            Sequence {
+                motions: (vec![
+                    (0.5, expect_time),
+                    (0.25, expect_time_2),
+                    (0.25, expect_time_3),
+                ]),
+            },
         );
 
         let mut tree = ObjectTree::new();

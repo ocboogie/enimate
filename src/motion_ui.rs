@@ -1,7 +1,6 @@
 use crate::{
     motion::{
-        AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, NoOp, Parallel, Sequence,
-        Trigger,
+        AddObject, AnimateTransform, FadeIn, Keyframe, MotionId, NoOp, Parallel, Sequence, Trigger,
     },
     scene::Scene,
 };

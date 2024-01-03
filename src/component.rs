@@ -1,11 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{
-    builder::{Builder, BuilderState},
-    motion::Motion,
-    object::{Object, ObjectId},
-    object_tree::ObjectTree,
-};
+use crate::building::Builder;
 
 pub trait Component {
     type Handle;

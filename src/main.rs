@@ -1,20 +1,15 @@
-use builder::{Builder, Left};
 use component::Component;
-use egui::{
-    epaint::{CircleShape, Tessellator},
-    pos2, Color32, Stroke, Vec2,
-};
+use egui::{pos2, Color32, Stroke, Vec2};
 use lyon::path::Path;
-use mesh::Mesh;
-use motion::{AnimateTransform, Parallel};
+
+use building::{Builder, SceneBuilder};
 use motion_ui::fixme;
-use object::{Material, Model, Object, ObjectId, ObjectKind, Transform};
+use object::{ObjectId, ObjectKind};
 use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
-use scene_builder::SceneBuilder;
 
-mod builder;
+mod building;
 mod component;
 mod mesh;
 mod motion;
@@ -23,12 +18,12 @@ mod object;
 mod object_tree;
 mod renderer;
 mod scene;
-mod scene_builder;
 mod utils;
 mod world;
 
 struct App {
-    scene: Scene,
+    current_scene: usize,
+    scenes: Vec<(&'static str, Scene)>,
     renderer: Renderer,
     play: bool,
     current_time: f32,
@@ -63,23 +58,33 @@ fn show_object(ui: &mut egui::Ui, objects: &ObjectTree, id: ObjectId) {
     });
 }
 
+impl App {
+    fn scene(&self) -> &Scene {
+        &self.scenes[self.current_scene].1
+    }
+
+    fn scene_mut(&mut self) -> &mut Scene {
+        &mut self.scenes[self.current_scene].1
+    }
+}
+
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let dt = ctx.input(|i| i.stable_dt) as f32;
 
-        if self.play && self.current_time < self.scene.length {
+        if self.play && self.current_time < self.scene().length {
             self.current_time += dt;
         }
 
-        if self.current_time >= self.scene.length {
+        if self.current_time >= self.scene().length {
             self.play = false;
-            self.current_time = self.scene.length;
+            self.current_time = self.scene().length;
         }
 
         ctx.request_repaint();
 
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            if self.current_time >= self.scene.length {
+            if self.current_time >= self.scene().length {
                 self.current_time = 0.0;
                 self.play = true;
             } else {
@@ -87,14 +92,31 @@ impl eframe::App for App {
             }
         }
 
-        let objects = self.scene.objects_at(self.current_time);
+        let current_time = self.current_time;
+        let objects = self.scene_mut().objects_at(current_time);
 
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            egui::ComboBox::from_label("Scene")
+                .selected_text(format!("{}", self.scenes[self.current_scene].0))
+                .show_ui(ui, |ui| {
+                    for (i, (name, _)) in self.scenes.iter().enumerate() {
+                        if ui
+                            .selectable_value(&mut self.current_scene, i, *name)
+                            .clicked()
+                        {
+                            self.current_time = 0.0;
+                            self.play = true;
+                        }
+                    }
+                });
+        });
+
+        egui::SidePanel::left("scene_panel").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading("Animations");
+                ui.heading("Scene Tree");
                 ui.separator();
-                let root = self.scene.root;
-                fixme(ui, &mut self.scene, root);
+                let root = self.scene().root;
+                fixme(ui, self.scene_mut(), root);
                 // self.scene.root_mut().ui(ui, &mut self.scene);
             });
         });
@@ -120,14 +142,15 @@ impl eframe::App for App {
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                let length = self.scene().length;
+
                 ui.add(
-                    egui::Slider::new(&mut self.current_time, 0.0..=self.scene.length)
-                        .clamp_to_range(true),
+                    egui::Slider::new(&mut self.current_time, 0.0..=length).clamp_to_range(true),
                 );
 
                 egui::Frame::canvas(ui.style()).show(ui, |ui| {
                     let rect = ui.available_rect_before_wrap();
-                    let response = ui.allocate_rect(rect, egui::Sense::drag());
+                    let _response = ui.allocate_rect(rect, egui::Sense::drag());
 
                     let boxes = objects.bounding_boxes();
 
@@ -135,7 +158,7 @@ impl eframe::App for App {
 
                     if false {
                         let bb_canvas = ui.painter_at(rect);
-                        for (id, bb) in boxes {
+                        for (_id, bb) in boxes {
                             bb_canvas.rect_stroke(
                                 bb.translate(rect.center().to_vec2()),
                                 0.0,
@@ -150,11 +173,12 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scene: Scene) -> Self {
+    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scenes: Vec<(&'static str, Scene)>) -> Self {
         let renderer = Renderer::new(cc).unwrap();
 
         Self {
-            scene,
+            current_scene: 0,
+            scenes,
             renderer,
             play: true,
             current_time: 0.0,
@@ -168,17 +192,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut native_options = eframe::NativeOptions::default();
     native_options.renderer = eframe::Renderer::Wgpu;
 
+    eframe::run_native(
+        "My egui App",
+        native_options,
+        Box::new(|cc| {
+            Box::new(App::new(
+                cc,
+                vec![("Alignment", alignment()), ("Animations", animations())],
+            ))
+        }),
+    )?;
+
+    Ok(())
+}
+
+fn alignment() -> Scene {
+    let mut b = SceneBuilder::new(5.0);
+
+    b.parallel(|p| {
+        let moving_rect = p
+            .rect(50.0, 50.0, Color32::RED.into())
+            .with_position(pos2(0.0, 0.0))
+            .animate(0.3, |a| a.fade_in());
+    });
+
+    b.finish()
+}
+
+fn animations() -> Scene {
     let mut scene_builder = SceneBuilder::new(5.0);
 
-    let size = Vec2::new(500.0, 500.0);
-
-    // let obj = scene_builder
-    //     .circle(50.0, Color32::RED.into())
-    //     .with_position(pos2(-100.0, -100.0))
-    //     .with_anchor(pos2(50.0, 0.0))
-    //     .add();
-
-    // scene_builder.animate(obj, 1.0, |a| a.fade_in());
     scene_builder.parallel(|p| {
         for i in 0..9 {
             p.sequence(|s| {
@@ -193,15 +236,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let scene = scene_builder.finish();
-
-    eframe::run_native(
-        "My egui App",
-        native_options,
-        Box::new(|cc| Box::new(App::new(cc, scene))),
-    )?;
-
-    Ok(())
+    scene_builder.finish()
 }
 
 struct Grid {
