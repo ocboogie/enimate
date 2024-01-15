@@ -2,9 +2,12 @@ use crate::{
     mesh::{Mesh, Vertex},
     object::{Material, Object, ObjectId, ObjectKind, Transform},
 };
-use egui::{pos2, Rect};
+use egui::{pos2, Color32};
 use lyon::{
-    lyon_tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers},
+    lyon_tessellation::{
+        BuffersBuilder, FillOptions, FillTessellator, FillVertex, StrokeOptions, StrokeTessellator,
+        StrokeVertex, VertexBuffers,
+    },
     path::Path,
 };
 use std::{
@@ -33,11 +36,18 @@ impl DerefMut for ObjectTree {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
+pub enum RenderObjectKind {
+    Stroke,
+    Fill,
+}
+
 pub struct RenderObject {
     pub id: ObjectId,
     pub mesh: Mesh,
-    pub material: Material,
+    pub color: Color32,
     pub transform: Transform,
+    pub kind: RenderObjectKind,
 }
 
 impl ObjectTree {
@@ -60,7 +70,7 @@ impl ObjectTree {
         }
     }
 
-    fn tessellate(tessellator: &mut FillTessellator, path: &Path) -> Mesh {
+    fn tessellate_fill(tessellator: &mut FillTessellator, path: &Path) -> Mesh {
         let mut geometry: VertexBuffers<Vertex, u32> = VertexBuffers::new();
 
         let mut buffers_builder = BuffersBuilder::new(&mut geometry, |vertex: FillVertex| {
@@ -80,11 +90,40 @@ impl ObjectTree {
         }
     }
 
+    fn tessellate_stroke(
+        tessellator: &mut StrokeTessellator,
+        line_width: f32,
+        path: &Path,
+    ) -> Mesh {
+        let mut geometry: VertexBuffers<Vertex, u32> = VertexBuffers::new();
+
+        let mut buffers_builder = BuffersBuilder::new(&mut geometry, |vertex: StrokeVertex| {
+            let pos = vertex.position();
+            Vertex {
+                pos: pos2(pos.x, pos.y),
+            }
+        });
+
+        tessellator
+            .tessellate_path(
+                path,
+                &StrokeOptions::default().with_line_width(line_width),
+                &mut buffers_builder,
+            )
+            .unwrap();
+
+        Mesh {
+            vertices: geometry.vertices,
+            indices: geometry.indices,
+        }
+    }
+
     pub fn render_object(
         &self,
         id: ObjectId,
         transform: Transform,
-        tessellator: &mut FillTessellator,
+        fill_tessellator: &mut FillTessellator,
+        stroke_tessellator: &mut StrokeTessellator,
         objects: &mut Vec<RenderObject>,
     ) {
         let object = self.objects.get(&id).unwrap();
@@ -92,16 +131,43 @@ impl ObjectTree {
 
         match &object.object_kind {
             ObjectKind::Model(model) => {
-                objects.push(RenderObject {
-                    id,
-                    mesh: Self::tessellate(tessellator, &model.path),
-                    material: model.material.clone(),
-                    transform,
-                });
+                if model.material.fill.is_none() && model.material.stroke.is_none() {
+                    panic!("Tried to render object with no fill or stroke");
+                }
+
+                if let Some(fill) = &model.material.fill {
+                    objects.push(RenderObject {
+                        id,
+                        mesh: Self::tessellate_fill(fill_tessellator, &model.path),
+                        color: fill.color,
+                        transform,
+                        kind: RenderObjectKind::Fill,
+                    });
+                }
+
+                if let Some(stroke) = &model.material.stroke {
+                    objects.push(RenderObject {
+                        id,
+                        mesh: Self::tessellate_stroke(
+                            stroke_tessellator,
+                            stroke.width,
+                            &model.path,
+                        ),
+                        color: stroke.color,
+                        transform,
+                        kind: RenderObjectKind::Stroke,
+                    });
+                }
             }
             ObjectKind::Group(group) => {
                 for child_id in group {
-                    self.render_object(*child_id, transform, tessellator, objects);
+                    self.render_object(
+                        *child_id,
+                        transform,
+                        fill_tessellator,
+                        stroke_tessellator,
+                        objects,
+                    );
                 }
             }
         }
@@ -109,12 +175,14 @@ impl ObjectTree {
 
     pub fn render(&self) -> Vec<RenderObject> {
         let mut objects = Vec::new();
-        let mut tessellator = FillTessellator::new();
+        let mut fill_tessellator = FillTessellator::new();
+        let mut stroke_tessellator = StrokeTessellator::new();
 
         self.render_object(
             self.root,
             Transform::default(),
-            &mut tessellator,
+            &mut fill_tessellator,
+            &mut stroke_tessellator,
             &mut objects,
         );
         objects

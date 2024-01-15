@@ -1,14 +1,50 @@
 use egui::{pos2, Color32, Pos2, Rect};
 use lyon::path::Path;
 
-#[derive(Clone, Default, Debug)]
-pub struct Material {
+#[derive(Clone, Debug)]
+pub struct FillMaterial {
     pub color: Color32,
 }
 
-impl From<Color32> for Material {
-    fn from(color: Color32) -> Self {
+impl FillMaterial {
+    pub fn new(color: Color32) -> Self {
         Self { color }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StrokeMaterial {
+    pub color: Color32,
+    pub width: f32,
+}
+
+impl StrokeMaterial {
+    pub fn new(color: Color32, width: f32) -> Self {
+        Self { color, width }
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct Material {
+    pub fill: Option<FillMaterial>,
+    pub stroke: Option<StrokeMaterial>,
+}
+
+impl From<FillMaterial> for Material {
+    fn from(fill: FillMaterial) -> Self {
+        Self {
+            fill: Some(fill),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<StrokeMaterial> for Material {
+    fn from(stroke: StrokeMaterial) -> Self {
+        Self {
+            stroke: Some(stroke),
+            ..Default::default()
+        }
     }
 }
 

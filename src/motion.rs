@@ -148,35 +148,35 @@ impl Motion for AddObject {
     }
 }
 
-pub struct FadeIn {
-    pub object_id: usize,
-}
-
-fn fade_in(world: &mut World, object_id: usize) {
-    let mut object = world.objects.remove(&object_id).unwrap();
-
-    match &mut object.object_kind {
-        ObjectKind::Model(ref mut model) => {
-            let c = model.material.color;
-            model.material.color =
-                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (world.time * 255.0) as u8);
-        }
-        ObjectKind::Group(group) => {
-            for child_id in group.iter() {
-                fade_in(world, *child_id);
-            }
-        }
-    }
-
-    world.objects.add(object_id, object, false);
-}
-
-impl Motion for FadeIn {
-    fn animate(&self, world: &mut World) {
-        // FIXME: We should be able to animate the alpha value of the color.
-        fade_in(world, self.object_id);
-    }
-}
+// pub struct FadeIn {
+//     pub object_id: usize,
+// }
+//
+// fn fade_in(world: &mut World, object_id: usize) {
+//     let mut object = world.objects.remove(&object_id).unwrap();
+//
+//     match &mut object.object_kind {
+//         ObjectKind::Model(ref mut model) => {
+//             let c = model.material.color;
+//             model.material.color =
+//                 Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (world.time * 255.0) as u8);
+//         }
+//         ObjectKind::Group(group) => {
+//             for child_id in group.iter() {
+//                 fade_in(world, *child_id);
+//             }
+//         }
+//     }
+//
+//     world.objects.add(object_id, object, false);
+// }
+//
+// impl Motion for FadeIn {
+//     fn animate(&self, world: &mut World) {
+//         // FIXME: We should be able to animate the alpha value of the color.
+//         fade_in(world, self.object_id);
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

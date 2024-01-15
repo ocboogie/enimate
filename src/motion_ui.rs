@@ -1,7 +1,5 @@
 use crate::{
-    motion::{
-        AddObject, AnimateTransform, FadeIn, Keyframe, MotionId, NoOp, Parallel, Sequence, Trigger,
-    },
+    motion::{AddObject, AnimateTransform, Keyframe, MotionId, NoOp, Parallel, Sequence, Trigger},
     scene::Scene,
 };
 
@@ -125,8 +123,8 @@ impl MotionUi for NoOp {
     }
 }
 
-impl MotionUi for FadeIn {
-    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
-        ui.label("Fade In");
-    }
-}
+// impl MotionUi for FadeIn {
+//     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
+//         ui.label("Fade In");
+//     }
+// }

@@ -1,12 +1,12 @@
 use crate::mesh::Vertex;
 use crate::object::{Material, ObjectId};
-use crate::object_tree::{ObjectTree, RenderObject};
+use crate::object_tree::{ObjectTree, RenderObject, RenderObjectKind};
 use eframe::wgpu::ColorTargetState;
 use eframe::{
     egui_wgpu::{self, wgpu},
     wgpu::util::DeviceExt,
 };
-use egui::{Rect, Rgba};
+use egui::{Color32, Rect, Rgba};
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -146,7 +146,7 @@ impl Renderer {
             pipeline,
             camera_bind_group,
             camera_buffer,
-            loaded_objects: HashMap::new(),
+            loaded_meshes: HashMap::new(),
         }
     }
 }
@@ -235,21 +235,21 @@ impl Renderer {
 //     }
 // }
 //
-// Same as Material but we convert the color to rgba
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct MaterialGpu {
     color: Rgba,
 }
 
-impl From<Material> for MaterialGpu {
-    fn from(material: Material) -> Self {
+impl From<Color32> for MaterialGpu {
+    fn from(color: Color32) -> Self {
         Self {
-            color: Rgba::from(material.color),
+            color: Rgba::from(color),
         }
     }
 }
-struct LoadedObject {
+
+struct LoadedMesh {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub transform_buffer: wgpu::Buffer,
@@ -257,15 +257,18 @@ struct LoadedObject {
     pub bind_group: wgpu::BindGroup,
 }
 
+#[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
+struct MeshId(RenderObjectKind, usize);
+
 struct RendererResources {
     pipeline: wgpu::RenderPipeline,
     camera_bind_group: wgpu::BindGroup,
     camera_buffer: wgpu::Buffer,
-    loaded_objects: HashMap<ObjectId, LoadedObject>,
+    loaded_meshes: HashMap<MeshId, LoadedMesh>,
 }
 
 impl RendererResources {
-    fn load_object(&mut self, device: &wgpu::Device, object: &RenderObject) {
+    fn load_render_object(&mut self, device: &wgpu::Device, object: &RenderObject) {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Vertex Buffer: {}", object.id)),
             contents: bytemuck::cast_slice(&object.mesh.vertices),
@@ -287,7 +290,7 @@ impl RendererResources {
         let material_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Material Buffer: {}", object.id)),
             // No need for padding, since material is 16 bytes aligned.
-            contents: bytemuck::bytes_of(&MaterialGpu::from(object.material.clone())),
+            contents: bytemuck::bytes_of(&MaterialGpu::from(object.color.clone())),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
         });
 
@@ -306,9 +309,9 @@ impl RendererResources {
             ],
         });
 
-        self.loaded_objects.insert(
-            object.id,
-            LoadedObject {
+        self.loaded_meshes.insert(
+            MeshId(object.kind, object.id),
+            LoadedMesh {
                 vertex_buffer,
                 index_buffer,
                 transform_buffer,
@@ -318,7 +321,7 @@ impl RendererResources {
         );
     }
 
-    fn update_mesh(queue: &wgpu::Queue, object: &RenderObject, loaded_objects: &LoadedObject) {
+    fn update_mesh(queue: &wgpu::Queue, object: &RenderObject, loaded_objects: &LoadedMesh) {
         // FIXME: Might have a bigger size than the vertex buffer, so
         //        just double check that the buffer can grow, which I don't
         //        think it can.
@@ -340,7 +343,7 @@ impl RendererResources {
         queue.write_buffer(
             &loaded_objects.material_buffer,
             0,
-            bytemuck::bytes_of(&MaterialGpu::from(object.material.clone())),
+            bytemuck::bytes_of(&MaterialGpu::from(object.color.clone())),
         );
     }
 
@@ -364,10 +367,10 @@ impl RendererResources {
         //        frame. Should hashing be used to determine if the buffer
         //        needs to be updated?
         for object in &world.render() {
-            if let Some(loaded_object) = self.loaded_objects.get(&object.id) {
+            if let Some(loaded_object) = self.loaded_meshes.get(&MeshId(object.kind, object.id)) {
                 Self::update_mesh(queue, object, loaded_object);
             } else {
-                self.load_object(device, object);
+                self.load_render_object(device, object);
             }
         }
     }
@@ -376,8 +379,11 @@ impl RendererResources {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-        for RenderObject { id, mesh, .. } in &world.render() {
-            let loaded_mesh = self.loaded_objects.get(id).expect("Mesh not loaded");
+        for RenderObject { kind, id, mesh, .. } in &world.render() {
+            let loaded_mesh = self
+                .loaded_meshes
+                .get(&MeshId(*kind, *id))
+                .expect("Mesh not loaded");
 
             render_pass.set_vertex_buffer(0, loaded_mesh.vertex_buffer.slice(..));
             render_pass.set_index_buffer(

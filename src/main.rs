@@ -7,7 +7,9 @@ use lyon::{math::point, path::Path};
 use motion::{AddObject, Motion, MotionId};
 // use building::{Builder, SceneBuilder};
 use motion_ui::fixme;
-use object::{Model, Object, ObjectId, ObjectKind, Transform};
+use object::{
+    FillMaterial, Material, Model, Object, ObjectId, ObjectKind, StrokeMaterial, Transform,
+};
 use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
@@ -175,7 +177,10 @@ fn path() -> Scene {
             object: Object {
                 object_kind: ObjectKind::Model(Model {
                     path,
-                    material: Color32::RED.into(),
+                    material: Material {
+                        fill: Some(FillMaterial::new(Color32::RED)),
+                        stroke: Some(StrokeMaterial::new(Color32::BLUE, 0.1)),
+                    },
                 }),
                 transform: Transform::default().with_scale(100.0),
             },
