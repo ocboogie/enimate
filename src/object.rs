@@ -1,5 +1,5 @@
-use crate::mesh::Mesh;
 use egui::{pos2, Color32, Pos2, Rect};
+use lyon::path::Path;
 
 #[derive(Clone, Default, Debug)]
 pub struct Material {
@@ -118,7 +118,7 @@ impl Transform {
 // it.
 #[derive(Clone, Debug)]
 pub struct Model {
-    pub mesh: Mesh,
+    pub path: Path,
     pub material: Material,
 }
 
@@ -137,9 +137,9 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn new_model(mesh: Mesh, material: Material) -> Self {
+    pub fn new_model(path: Path, material: Material) -> Self {
         Self {
-            object_kind: ObjectKind::Model(Model { mesh, material }),
+            object_kind: ObjectKind::Model(Model { path, material }),
             transform: Transform::default(),
         }
     }
