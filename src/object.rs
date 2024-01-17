@@ -162,6 +162,8 @@ pub type ObjectId = usize;
 
 #[derive(Clone, Debug)]
 pub enum ObjectKind {
+    // TODO: Maybe someday 🥲
+    // Model3D(Model3D),
     Model(Model),
     Group(Vec<ObjectId>),
 }

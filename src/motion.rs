@@ -1,24 +1,29 @@
 use egui::Color32;
 
-use crate::motion_ui::MotionUi;
 use crate::object::{Object, ObjectKind};
 
 use crate::object::Transform;
-use crate::world::World;
+use crate::world::{Variable, World};
 
 pub type MotionId = usize;
 
-/// A motion is the most basic momvement primitive. It is a function that takes a world and a time
+/// A motion is the most basic momvement primitive. It is a function that takes a world
 /// and updates the world, adding objects, mutating them, or animating them. The time is a value
 /// between 0 and 1.
-pub trait Motion: MotionUi {
-    fn animate(&self, world: &mut World);
+pub trait Motion {
+    fn animate(&self, world: &mut World, time: f32);
+}
+
+impl<F: Fn(&mut World, f32)> Motion for F {
+    fn animate(&self, world: &mut World, time: f32) {
+        self(world, time);
+    }
 }
 
 pub struct NoOp;
 
 impl Motion for NoOp {
-    fn animate(&self, _world: &mut World) {}
+    fn animate(&self, _world: &mut World, _time: f32) {}
 }
 
 pub struct Sequence {
@@ -27,12 +32,18 @@ pub struct Sequence {
 }
 
 impl Motion for Sequence {
-    fn animate(&self, world: &mut World) {
-        let mut time = 0.0;
+    fn animate(&self, world: &mut World, time: f32) {
+        let mut current_time = 0.0;
 
         for (duration, motion) in &self.motions {
-            world.play_at(*motion, ((world.time - time) / duration).min(1.0).max(0.0));
-            time += duration;
+            let adusted_time = (time - current_time) / duration;
+
+            if adusted_time < 0.0 {
+                return;
+            }
+
+            world.play_at(*motion, adusted_time.min(1.0));
+            current_time += duration;
         }
     }
 }
@@ -43,9 +54,9 @@ pub struct Parallel {
 }
 
 impl Motion for Parallel {
-    fn animate(&self, world: &mut World) {
+    fn animate(&self, world: &mut World, time: f32) {
         for motion in &self.motions {
-            world.play(*motion);
+            world.play_at(*motion, time);
         }
     }
 }
@@ -62,8 +73,8 @@ impl Trigger {
 }
 
 impl Motion for Trigger {
-    fn animate(&self, world: &mut World) {
-        if world.time >= self.time {
+    fn animate(&self, world: &mut World, time: f32) {
+        if time >= self.time {
             world.play_at(self.motion, 1.0);
         }
     }
@@ -91,8 +102,8 @@ impl Keyframe {
 }
 
 impl Motion for Keyframe {
-    fn animate(&self, world: &mut World) {
-        let mut adjusted_time = (world.time - self.from_min) / (self.from_max - self.from_min);
+    fn animate(&self, world: &mut World, time: f32) {
+        let mut adjusted_time = (time - self.from_min) / (self.from_max - self.from_min);
 
         // We don't want to run the animate function because, for example, the AddObject motion
         // relies on not being run if the time is out of bounds.
@@ -118,10 +129,8 @@ pub struct AnimateTransform {
 }
 
 impl Motion for AnimateTransform {
-    fn animate(&self, world: &mut World) {
+    fn animate(&self, world: &mut World, time: f32) {
         let object = world.objects.get_mut(&self.object_id).unwrap();
-
-        let time = world.time;
 
         object.transform = Transform {
             position: time * (self.to.position - self.from.position.to_vec2())
@@ -141,10 +150,32 @@ pub struct AddObject {
 }
 
 impl Motion for AddObject {
-    fn animate(&self, world: &mut World) {
+    fn animate(&self, world: &mut World, time: f32) {
         world
             .objects
             .add(self.object_id, self.object.clone(), self.rooted);
+    }
+}
+
+// Set variable to current time,
+pub struct SyncVariable {
+    pub var: Variable,
+}
+
+impl Motion for SyncVariable {
+    fn animate(&self, world: &mut World, time: f32) {
+        world.update_variable(self.var, time);
+    }
+}
+
+pub struct SetVariable {
+    pub ident: Variable,
+    pub value: f32,
+}
+
+impl Motion for SetVariable {
+    fn animate(&self, world: &mut World, _time: f32) {
+        world.update_variable(self.ident, self.value);
     }
 }
 
@@ -172,7 +203,7 @@ impl Motion for AddObject {
 // }
 //
 // impl Motion for FadeIn {
-//     fn animate(&self, world: &mut World) {
+//     fn animate(&self, world: &mut World, time: f32) {
 //         // FIXME: We should be able to animate the alpha value of the color.
 //         fade_in(world, self.object_id);
 //     }
@@ -188,13 +219,13 @@ mod tests {
 
     struct ExpectTime(f32);
 
-    impl MotionUi for ExpectTime {
-        fn ui(&mut self, _ui: &mut egui::Ui, _scene: &mut Scene) {}
-    }
+    // impl MotionUi for ExpectTime {
+    //     fn ui(&mut self, _ui: &mut egui::Ui, _scene: &mut Scene) {}
+    // }
 
     impl Motion for ExpectTime {
-        fn animate(&self, world: &mut World) {
-            assert_eq!(self.0, world.time);
+        fn animate(&self, world: &mut World, time: f32) {
+            assert_eq!(self.0, time);
         }
     }
 
@@ -226,7 +257,7 @@ mod tests {
 
         let mut tree = ObjectTree::new();
 
-        let mut world = World::new(0.0, &mut tree, &motions);
+        let mut world = World::new(&mut tree, &motions);
 
         world.play_at(seq, 0.875);
     }

@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use crate::{
     motion::{Motion, MotionId, NoOp},
     object_tree::ObjectTree,
-    world::World,
+    world::{Variable, World},
 };
 
 pub struct Scene {
     pub root: MotionId,
     pub motions: HashMap<MotionId, Box<dyn Motion>>,
+    pub variable_subscriptions: HashMap<Variable, Vec<MotionId>>,
     pub length: f32,
 }
 
@@ -21,14 +22,21 @@ impl Scene {
         Self {
             root,
             motions,
+            variable_subscriptions: HashMap::new(),
             length: 0.0,
         }
     }
 
-    pub fn new(motions: HashMap<MotionId, Box<dyn Motion>>, root: MotionId, length: f32) -> Self {
+    pub fn new(
+        motions: HashMap<MotionId, Box<dyn Motion>>,
+        root: MotionId,
+        variable_subscriptions: HashMap<usize, Vec<MotionId>>,
+        length: f32,
+    ) -> Self {
         Self {
             root,
             motions,
+            variable_subscriptions,
             length,
         }
     }
@@ -43,9 +51,9 @@ impl Scene {
 
     pub fn objects_at(&mut self, time: f32) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(time, &mut objects, &self.motions);
+        let mut world = World::new(&mut objects, &self.motions, &self.variable_subscriptions);
 
-        self.motions[&self.root].animate(&mut world);
+        self.motions[&self.root].animate(&mut world, time);
 
         objects
     }

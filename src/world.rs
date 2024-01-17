@@ -3,36 +3,50 @@ use std::collections::HashMap;
 use crate::motion::{Motion, MotionId};
 use crate::object_tree::ObjectTree;
 
+pub type Variable = usize;
+
 pub struct World<'a> {
     pub objects: &'a mut ObjectTree,
+    variables: HashMap<Variable, f32>,
+    variable_subscriptions: &'a HashMap<Variable, Vec<MotionId>>,
     motions: &'a HashMap<MotionId, Box<dyn Motion>>,
-    pub time: f32,
 }
 
 impl<'a> World<'a> {
     pub fn new(
-        time: f32,
         objects: &'a mut ObjectTree,
         motions: &'a HashMap<MotionId, Box<dyn Motion>>,
+        variable_subscriptions: &'a HashMap<Variable, Vec<MotionId>>,
     ) -> Self {
         Self {
             objects,
+            variables: HashMap::new(),
+            variable_subscriptions,
             motions,
-            time,
+        }
+    }
+
+    pub fn update_variable(&mut self, variable: Variable, value: f32) {
+        dbg!(self.variable_subscriptions.keys().collect::<Vec<_>>());
+        self.variables.insert(variable, value);
+
+        // TODO: cloned() is probably not necessary here.
+        // Although, then the alternative is to remove the subscriptions from the list.
+        if let Some(subscriptions) = self.variable_subscriptions.get(&variable).cloned() {
+            for motion in subscriptions {
+                self.play_at(motion, value);
+            }
         }
     }
 
     pub fn play(&mut self, motion: MotionId) {
-        // TODO: Provide a warning here somehow if the motion doesn't exist.
-        let motion = self.motions.get(&motion).unwrap();
-        motion.animate(self);
+        self.play_at(motion, 1.0);
     }
 
     pub fn play_at(&mut self, motion: MotionId, time: f32) {
+        // TODO: Provide a warning here somehow if the motion doesn't exist.
         let motion = self.motions.get(&motion).unwrap();
-        let current_time = self.time;
-        self.time = time;
-        motion.animate(self);
-        self.time = current_time;
+
+        motion.animate(self, time);
     }
 }

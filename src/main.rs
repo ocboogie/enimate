@@ -2,23 +2,27 @@ use std::collections::HashMap;
 
 // use component::Component;
 use egui::{pos2, Color32, Stroke, Vec2};
-use lyon::{math::point, path::Path};
+use lyon::{
+    math::point,
+    path::{traits::PathBuilder, Path, Winding},
+};
 
-use motion::{AddObject, Motion, MotionId};
+use motion::{AddObject, Motion, MotionId, Parallel, Sequence, SyncVariable};
 // use building::{Builder, SceneBuilder};
-use motion_ui::fixme;
+// use motion_ui::fixme;
 use object::{
     FillMaterial, Material, Model, Object, ObjectId, ObjectKind, StrokeMaterial, Transform,
 };
 use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
+use world::World;
 
 // mod building;
 // mod component;
 mod mesh;
 mod motion;
-mod motion_ui;
+// mod motion_ui;
 mod object;
 mod object_tree;
 mod renderer;
@@ -153,13 +157,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     eframe::run_native(
         "My egui App",
         native_options,
-        Box::new(|cc| Box::new(App::new(cc, vec![("Path", path())]))),
+        Box::new(|cc| {
+            Box::new(App::new(
+                cc,
+                vec![("Stroke", stroke()), ("Variables", variables())],
+            ))
+        }),
     )?;
 
     Ok(())
 }
 
-fn path() -> Scene {
+fn stroke() -> Scene {
     let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
     let root: MotionId = rand::random::<usize>();
 
@@ -189,5 +198,59 @@ fn path() -> Scene {
         }),
     );
 
-    Scene::new(motions, root, 2.0)
+    Scene::new(motions, root, HashMap::default(), 2.0)
+}
+
+fn variables() -> Scene {
+    let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
+    let mut variables_subscriptions: HashMap<usize, Vec<MotionId>> = HashMap::new();
+
+    let mut builder = Path::builder();
+    builder.add_circle(point(0.0, 0.0), 10.0, Winding::Positive);
+    let path = builder.build();
+
+    let add: MotionId = rand::random::<usize>();
+    let circle_id: ObjectId = rand::random::<usize>();
+    motions.insert(
+        add,
+        Box::new(AddObject {
+            object: Object {
+                object_kind: ObjectKind::Model(Model {
+                    path,
+                    material: FillMaterial::new(Color32::RED).into(),
+                }),
+                transform: Transform::default().with_scale(1.0),
+            },
+            rooted: true,
+            object_id: circle_id,
+        }),
+    );
+
+    let mv: MotionId = rand::random::<usize>();
+    motions.insert(mv, Box::new(SyncVariable { var: 0 }));
+
+    let root: MotionId = rand::random::<usize>();
+    motions.insert(
+        root,
+        Box::new(Parallel {
+            motions: vec![add, mv],
+        }),
+    );
+
+    let tracker: MotionId = rand::random::<usize>();
+    motions.insert(
+        tracker,
+        Box::new(move |world: &mut World, time: f32| {
+            let object = world.objects.get_mut(&circle_id).unwrap();
+
+            object.transform.position = pos2(
+                (time * std::f32::consts::PI).cos() * 100.0,
+                (time * std::f32::consts::PI).sin() * 100.0,
+            );
+        }),
+    );
+
+    variables_subscriptions.insert(0, vec![tracker]);
+
+    Scene::new(motions, root, variables_subscriptions, 2.0)
 }
