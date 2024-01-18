@@ -27,7 +27,6 @@ impl<'a> World<'a> {
     }
 
     pub fn update_variable(&mut self, variable: Variable, value: f32) {
-        dbg!(self.variable_subscriptions.keys().collect::<Vec<_>>());
         self.variables.insert(variable, value);
 
         // TODO: cloned() is probably not necessary here.
