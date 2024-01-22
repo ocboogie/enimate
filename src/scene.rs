@@ -49,11 +49,22 @@ impl Scene {
         self.motions.get_mut(&self.root).unwrap()
     }
 
-    pub fn objects_at(&mut self, time: f32) -> ObjectTree {
+    pub fn render_at(&mut self, time: f32) -> ObjectTree {
         let mut objects = ObjectTree::new();
         let mut world = World::new(&mut objects, &self.motions, &self.variable_subscriptions);
 
         self.motions[&self.root].animate(&mut world, time);
+
+        objects
+    }
+
+    pub fn render_with_input(&mut self, time: f32, input: HashMap<Variable, f32>) -> ObjectTree {
+        let mut objects = ObjectTree::new();
+        let mut world = World::new(&mut objects, &self.motions, &self.variable_subscriptions);
+
+        self.motions[&self.root].animate(&mut world, time);
+
+        world.update_variables(&input);
 
         objects
     }

@@ -38,6 +38,12 @@ impl<'a> World<'a> {
         }
     }
 
+    pub fn update_variables(&mut self, variables: &HashMap<Variable, f32>) {
+        for (variable, value) in variables {
+            self.update_variable(*variable, *value);
+        }
+    }
+
     pub fn play(&mut self, motion: MotionId) {
         self.play_at(motion, 1.0);
     }

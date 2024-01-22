@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 // use component::Component;
-use egui::{pos2, Color32, Stroke, Vec2};
+use egui::{pos2, Color32, Pos2, Stroke, Vec2};
 use lyon::{
     math::point,
     path::{traits::PathBuilder, Path, Winding},
@@ -72,9 +72,6 @@ impl eframe::App for App {
             }
         }
 
-        let current_time = self.current_time;
-        let objects = self.scene_mut().objects_at(current_time);
-
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::ComboBox::from_label("Scene")
                 .selected_text(format!("{}", self.scenes[self.current_scene].0))
@@ -115,6 +112,17 @@ impl eframe::App for App {
                     let _response = ui.allocate_rect(rect, egui::Sense::drag());
 
                     // let boxes = objects.bounding_boxes();
+
+                    let mut input = HashMap::new();
+                    let pos = ctx.input(|i| i.pointer.hover_pos()).unwrap_or(Pos2::ZERO);
+
+                    let pos = pos - rect.center().to_vec2();
+
+                    input.insert(0, pos.x);
+                    input.insert(1, pos.y);
+
+                    let current_time = self.current_time;
+                    let objects = self.scene_mut().render_with_input(current_time, input);
 
                     self.renderer.paint_at(ui, rect, objects);
 
@@ -160,7 +168,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Box::new(|cc| {
             Box::new(App::new(
                 cc,
-                vec![("Stroke", stroke()), ("Variables", variables())],
+                vec![
+                    ("Mouse input", mouse_input()),
+                    ("Stroke", stroke()),
+                    ("Variables", variables()),
+                ],
             ))
         }),
     )?;
@@ -251,6 +263,56 @@ fn variables() -> Scene {
     );
 
     variables_subscriptions.insert(0, vec![tracker]);
+
+    Scene::new(motions, root, variables_subscriptions, 2.0)
+}
+
+fn mouse_input() -> Scene {
+    let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
+    let mut variables_subscriptions: HashMap<usize, Vec<MotionId>> = HashMap::new();
+
+    let mut builder = Path::builder();
+    builder.add_circle(point(0.0, 0.0), 10.0, Winding::Positive);
+    let path = builder.build();
+
+    let root: MotionId = rand::random::<usize>();
+    let circle_id: ObjectId = rand::random::<usize>();
+    motions.insert(
+        root,
+        Box::new(AddObject {
+            object: Object {
+                object_kind: ObjectKind::Model(Model {
+                    path,
+                    material: FillMaterial::new(Color32::RED).into(),
+                }),
+                transform: Transform::default().with_scale(1.0),
+            },
+            rooted: true,
+            object_id: circle_id,
+        }),
+    );
+
+    let update_x: MotionId = rand::random::<usize>();
+    motions.insert(
+        update_x,
+        Box::new(move |world: &mut World, time: f32| {
+            let object = world.objects.get_mut(&circle_id).unwrap();
+
+            object.transform.position.x = time;
+        }),
+    );
+    let update_y: MotionId = rand::random::<usize>();
+    motions.insert(
+        update_y,
+        Box::new(move |world: &mut World, time: f32| {
+            let object = world.objects.get_mut(&circle_id).unwrap();
+
+            object.transform.position.y = time;
+        }),
+    );
+
+    variables_subscriptions.insert(0, vec![update_x]);
+    variables_subscriptions.insert(1, vec![update_y]);
 
     Scene::new(motions, root, variables_subscriptions, 2.0)
 }
