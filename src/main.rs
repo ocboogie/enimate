@@ -238,8 +238,10 @@ fn variables() -> Scene {
         }),
     );
 
+    let var = 3;
+
     let mv: MotionId = rand::random::<usize>();
-    motions.insert(mv, Box::new(SyncVariable { var: 0 }));
+    motions.insert(mv, Box::new(SyncVariable { var }));
 
     let root: MotionId = rand::random::<usize>();
     motions.insert(
@@ -262,7 +264,7 @@ fn variables() -> Scene {
         }),
     );
 
-    variables_subscriptions.insert(0, vec![tracker]);
+    variables_subscriptions.insert(var, vec![tracker]);
 
     Scene::new(motions, root, variables_subscriptions, 2.0)
 }
