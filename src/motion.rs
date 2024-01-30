@@ -158,11 +158,11 @@ impl Motion for AddObject {
 }
 
 // Set variable to current time,
-pub struct SyncVariable {
+pub struct SyncVariableWithTime {
     pub var: Variable,
 }
 
-impl Motion for SyncVariable {
+impl Motion for SyncVariableWithTime {
     fn animate(&self, world: &mut World, time: f32) {
         world.update_variable(self.var, time);
     }
@@ -176,6 +176,19 @@ pub struct SetVariable {
 impl Motion for SetVariable {
     fn animate(&self, world: &mut World, _time: f32) {
         world.update_variable(self.ident, self.value);
+    }
+}
+
+struct VariableSetter<M: Fn(&World, f32) -> f32> {
+    pub ident: Variable,
+    pub motion: M,
+}
+
+impl<M: Fn(&World, f32) -> f32> Motion for VariableSetter<M> {
+    fn animate(&self, world: &mut World, time: f32) {
+        let value = (self.motion)(world, time);
+
+        world.update_variable(self.ident, value);
     }
 }
 
