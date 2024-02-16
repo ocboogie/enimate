@@ -1,5 +1,9 @@
 use egui::{pos2, Color32, Pos2, Rect};
-use lyon::path::Path;
+use lyon::{
+    algorithms::aabb::bounding_box,
+    math::{point, Box2D},
+    path::Path,
+};
 
 #[derive(Clone, Debug)]
 pub struct FillMaterial {
@@ -193,4 +197,21 @@ impl Object {
         self.transform = transform;
         self
     }
+
+    // pub fn bounding_box(&self) -> Box2D {
+    //     let box = match &self.object_kind {
+    //         ObjectKind::Model(model) => bounding_box(&model.path)
+    //         ObjectKind::Group(group) => {
+    //             let mut bounding_box = Box2D::new(point(0.0, 0.0), point(0.0, 0.0));
+    //             for object_id in group {
+    //                 let object = world.objects.get(object_id).unwrap();
+    //                 let object_bounding_box = object.bounding_box();
+    //                 bounding_box = bounding_box.union(object_bounding_box);
+    //             }
+    //             bounding_box
+    //         }
+    //     };
+    //
+    //
+    // }
 }

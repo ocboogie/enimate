@@ -3,8 +3,9 @@ use crate::{
     object::{Object, ObjectId, Transform},
 };
 use egui::Rect;
+use lyon::math::Box2D;
 
-use super::{AnimationBuilder, Builder, BuilderState};
+use super::{AnimationBuilder, Builder, BuilderState, Positioner};
 
 #[must_use]
 pub struct ObjectBuilder<'a, B: Builder> {
@@ -39,30 +40,31 @@ impl<'a, B: Builder> ObjectBuilder<'a, B> {
         self
     }
 
-    pub fn with_position(mut self, position: egui::Pos2) -> Self {
+    pub fn with_position(mut self, pos: impl Positioner) -> Self {
+        let position = pos.position(self.object_id, self.builder.state());
+
         self.object.transform.position = position;
         self
     }
 
-    pub fn with_anchor(mut self, anchor: egui::Pos2) -> Self {
+    pub fn with_anchor(mut self, anchor: impl Positioner) -> Self {
+        let anchor = anchor.position(self.object_id, self.builder.state());
+
         self.object.transform.anchor = anchor;
         self
     }
 
-    fn bounding_box(&mut self) -> Rect {
-        self.builder
-            .state()
-            .objects
-            .local_bounding_box_obj(&self.object)
-    }
-
-    pub fn with_centered_anchor(mut self) -> Self {
-        let bounding_box = self.bounding_box();
-
-        self.object.transform.position -= bounding_box.center().to_vec2();
-        self.object.transform.anchor = bounding_box.center();
-        self
-    }
+    // fn bounding_box(&mut self) -> Box2D {
+    //     self.object.b
+    // }
+    //
+    // pub fn with_centered_anchor(mut self) -> Self {
+    //     let bounding_box = self.bounding_box();
+    //
+    //     self.object.transform.position -= bounding_box.center().to_vec2();
+    //     self.object.transform.anchor = bounding_box.center();
+    //     self
+    // }
 
     pub fn add(self) -> ObjectId {
         self.builder.add_object(self.object_id, self.object);

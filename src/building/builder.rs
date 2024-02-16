@@ -5,11 +5,13 @@ use crate::{
 };
 use egui::pos2;
 use lyon::{
+    geom::Box2D,
     lyon_tessellation::{
         BuffersBuilder, FillGeometryBuilder, FillVertex, StrokeGeometryBuilder, StrokeOptions,
         StrokeTessellator, StrokeVertex,
     },
-    path::Path,
+    math::point,
+    path::{Path, Winding},
     tessellation::{FillOptions, FillTessellator, VertexBuffers},
 };
 
@@ -207,18 +209,10 @@ pub trait Builder: Sized {
     }
 
     fn circle(&mut self, radius: f32, material: Material) -> ObjectBuilder<Self> {
-        let mesh = self.tessellate(|mut tessellator, buffers_builder| {
-            tessellator
-                .tessellate_circle(
-                    lyon::math::point(0.0, 0.0),
-                    radius,
-                    &FillOptions::default(),
-                    buffers_builder,
-                )
-                .unwrap();
-        });
+        let mut builder = Path::builder();
+        builder.add_circle(point(0.0, 0.0), radius, Winding::Positive);
 
-        let object = Object::new_model(mesh, material);
+        let object = Object::new_model(builder.build(), material);
 
         ObjectBuilder::new(object, self)
     }
@@ -227,62 +221,37 @@ pub trait Builder: Sized {
         &mut self,
         start: egui::Pos2,
         end: egui::Pos2,
-        width: f32,
         material: Material,
     ) -> ObjectBuilder<Self> {
         let mut builder = Path::builder();
-        builder.begin(lyon::math::point(start.x, start.y));
-        builder.line_to(lyon::math::point(end.x, end.y));
+        builder.begin(point(start.x, start.y));
+        builder.line_to(point(end.x, end.y));
         builder.close();
 
         let path = builder.build();
 
-        let mesh = self.tessellate_stroke(|mut tessellator, buffers_builder| {
-            tessellator
-                .tessellate_path(
-                    &path,
-                    &StrokeOptions::default().with_line_width(width),
-                    buffers_builder,
-                )
-                .unwrap();
-        });
-
-        let object = Object::new_model(mesh, material);
+        let object = Object::new_model(path, material);
 
         ObjectBuilder::new(object, self)
     }
 
     fn rect(&mut self, width: f32, height: f32, material: Material) -> ObjectBuilder<Self> {
-        let mesh = self.tessellate(|mut tessellator, buffers_builder| {
-            tessellator
-                .tessellate_rectangle(
-                    &lyon::math::Box2D::new(
-                        lyon::math::point(-width / 2.0, -height / 2.0),
-                        lyon::math::point(width / 2.0, height / 2.0),
-                    ),
-                    &FillOptions::default(),
-                    buffers_builder,
-                )
-                .unwrap();
-        });
+        let mut builder = Path::builder();
+        builder.add_rectangle(
+            &Box2D::new(
+                point(-width / 2.0, -height / 2.0),
+                point(width / 2.0, height / 2.0),
+            ),
+            Winding::Positive,
+        );
 
-        let object = Object::new_model(mesh, material);
+        let object = Object::new_model(builder.build(), material);
 
         ObjectBuilder::new(object, self)
     }
 
-    fn path(&mut self, path: Path, width: f32, material: Material) -> ObjectBuilder<Self> {
-        let mesh = self.tessellate_stroke(|mut tessellator, buffers_builder| {
-            tessellator
-                .tessellate_path(
-                    &path,
-                    &StrokeOptions::default().with_line_width(width),
-                    buffers_builder,
-                )
-                .unwrap();
-        });
-
-        let object = Object::new_model(mesh, material);
+    fn path(&mut self, path: Path, material: Material) -> ObjectBuilder<Self> {
+        let object = Object::new_model(path, material);
 
         ObjectBuilder::new(object, self)
     }

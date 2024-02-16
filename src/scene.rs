@@ -9,7 +9,6 @@ use crate::{
 pub struct Scene {
     pub root: MotionId,
     pub motions: HashMap<MotionId, Box<dyn Motion>>,
-    pub variable_subscriptions: HashMap<Variable, Vec<MotionId>>,
     pub length: f32,
 }
 
@@ -22,21 +21,14 @@ impl Scene {
         Self {
             root,
             motions,
-            variable_subscriptions: HashMap::new(),
             length: 0.0,
         }
     }
 
-    pub fn new(
-        motions: HashMap<MotionId, Box<dyn Motion>>,
-        root: MotionId,
-        variable_subscriptions: HashMap<usize, Vec<MotionId>>,
-        length: f32,
-    ) -> Self {
+    pub fn new(motions: HashMap<MotionId, Box<dyn Motion>>, root: MotionId, length: f32) -> Self {
         Self {
             root,
             motions,
-            variable_subscriptions,
             length,
         }
     }
@@ -51,7 +43,7 @@ impl Scene {
 
     pub fn render_at(&mut self, time: f32) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, &self.motions, &self.variable_subscriptions);
+        let mut world = World::new(&mut objects, &self.motions);
 
         self.motions[&self.root].animate(&mut world, time);
 
@@ -60,11 +52,11 @@ impl Scene {
 
     pub fn render_with_input(&mut self, time: f32, input: HashMap<Variable, f32>) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, &self.motions, &self.variable_subscriptions);
-
-        self.motions[&self.root].animate(&mut world, time);
+        let mut world = World::new(&mut objects, &self.motions);
 
         world.update_variables(&input);
+
+        self.motions[&self.root].animate(&mut world, time);
 
         objects
     }

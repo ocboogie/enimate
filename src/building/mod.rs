@@ -35,8 +35,8 @@ impl BuilderState {
 
     pub fn emulate_motion(&mut self, motion: &dyn Motion) {
         // Run the motion, so the state of objects is consistent with the end of the motion.
-        let world = &mut World::new(1.0, &mut self.objects, &self.motions);
-        motion.animate(world);
+        let world = &mut World::new(&mut self.objects, &self.motions);
+        motion.animate(world, 1.0);
     }
 
     pub fn normalize_time(&self, time: f32) -> f32 {

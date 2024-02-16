@@ -1,10 +1,40 @@
+use std::borrow::Cow;
+
 use crate::{
-    motion::{AddObject, AnimateTransform, Keyframe, MotionId, NoOp, Parallel, Sequence, Trigger},
+    motion::{
+        AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, NoOp, Parallel, Rotate,
+        Sequence, SetTransform, SetVariable, Trigger,
+    },
     scene::Scene,
+    world::World,
 };
 
 pub trait MotionUi {
     fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene);
+}
+
+pub trait MotionGenericUi {
+    fn label(&self) -> Cow<'static, str>;
+    fn children(&self) -> &[MotionId] {
+        &[]
+    }
+}
+
+impl<M: MotionGenericUi> MotionUi for M {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
+        ui.label(self.label());
+        let children = self.children();
+
+        if children.is_empty() {
+            return;
+        }
+
+        ui.indent(self.label(), |ui| {
+            for id in children {
+                fixme(ui, scene, *id);
+            }
+        });
+    }
 }
 
 pub fn fixme(ui: &mut egui::Ui, scene: &mut Scene, motion_id: MotionId) {
@@ -68,54 +98,39 @@ impl MotionUi for AddObject {
     }
 }
 
-impl MotionUi for AnimateTransform {
-    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
-        ui.label("Animate Transform");
-        ui.indent("Animate Transform", |ui| {
-            ui.add(
-                egui::Slider::new(&mut self.from.position.x, -100.0..=100.0)
-                    .clamp_to_range(false)
-                    .text("From X"),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.from.position.y, -100.0..=100.0)
-                    .clamp_to_range(false)
-                    .text("From Y"),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.from.rotation, 0.0..=360.0)
-                    .clamp_to_range(false)
-                    .text("From Rotation"),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.from.scale, 0.0..=100.0)
-                    .clamp_to_range(false)
-                    .text("From Scale"),
-            );
-
-            ui.add(
-                egui::Slider::new(&mut self.to.position.x, -100.0..=100.0)
-                    .clamp_to_range(false)
-                    .text("To X"),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.to.position.y, -100.0..=100.0)
-                    .clamp_to_range(false)
-                    .text("To Y"),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.to.rotation, 0.0..=360.0)
-                    .clamp_to_range(false)
-                    .text("To Rotation"),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.to.scale, 0.0..=100.0)
-                    .clamp_to_range(false)
-                    .text("To Scale"),
-            );
-        });
+impl MotionGenericUi for AnimateTransform {
+    fn label(&self) -> Cow<'static, str> {
+        format!("Animate Transform {}", self.object_id).into()
     }
 }
+
+// impl MotionUi for Transform {
+//     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
+//         ui.label(format!("Transform {}", self.object_id));
+//         ui.indent("Transform", |ui| {
+//             ui.add(
+//                 egui::Slider::new(&mut self.transform.position.x, -100.0..=100.0)
+//                     .clamp_to_range(false)
+//                     .text("X"),
+//             );
+//             ui.add(
+//                 egui::Slider::new(&mut self.transform.position.y, -100.0..=100.0)
+//                     .clamp_to_range(false)
+//                     .text("Y"),
+//             );
+//             ui.add(
+//                 egui::Slider::new(&mut self.transform.rotation, 0.0..=360.0)
+//                     .clamp_to_range(false)
+//                     .text("Rotation"),
+//             );
+//             ui.add(
+//                 egui::Slider::new(&mut self.transform.scale, 0.0..=100.0)
+//                     .clamp_to_range(false)
+//                     .text("Scale"),
+//             );
+//         });
+//     }
+// }
 
 impl MotionUi for NoOp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
@@ -123,8 +138,26 @@ impl MotionUi for NoOp {
     }
 }
 
-// impl MotionUi for FadeIn {
-//     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
-//         ui.label("Fade In");
-//     }
-// }
+impl MotionGenericUi for SetVariable {
+    fn label(&self) -> Cow<'static, str> {
+        format!("Set Variable {}", self.var).into()
+    }
+}
+
+impl MotionGenericUi for SetTransform {
+    fn label(&self) -> Cow<'static, str> {
+        format!("Set Transofrm {}", self.object_id).into()
+    }
+}
+
+impl MotionGenericUi for Rotate {
+    fn label(&self) -> Cow<'static, str> {
+        format!("Rotate {}", self.object_id).into()
+    }
+}
+
+impl MotionUi for FadeIn {
+    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
+        ui.label("Fade In");
+    }
+}

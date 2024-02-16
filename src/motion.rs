@@ -1,8 +1,11 @@
 use egui::Color32;
 
-use crate::object::{Object, ObjectKind};
+use crate::dynamics::{DynamicTransform, DynamicValue, DynamicVector};
+use crate::object::{Object, ObjectId, ObjectKind};
 
-use crate::object::Transform;
+use crate::motion_ui::MotionUi;
+use crate::object::Transform as ObjectTransform;
+use crate::utils::rotate_vec_around_vector;
 use crate::world::{Variable, World};
 
 pub type MotionId = usize;
@@ -10,14 +13,8 @@ pub type MotionId = usize;
 /// A motion is the most basic momvement primitive. It is a function that takes a world
 /// and updates the world, adding objects, mutating them, or animating them. The time is a value
 /// between 0 and 1.
-pub trait Motion {
+pub trait Motion: MotionUi {
     fn animate(&self, world: &mut World, time: f32);
-}
-
-impl<F: Fn(&mut World, f32)> Motion for F {
-    fn animate(&self, world: &mut World, time: f32) {
-        self(world, time);
-    }
 }
 
 pub struct NoOp;
@@ -124,24 +121,75 @@ impl Motion for Keyframe {
 
 pub struct AnimateTransform {
     pub object_id: usize,
-    pub from: Transform,
-    pub to: Transform,
+    pub from: DynamicTransform,
+    pub to: DynamicTransform,
 }
 
 impl Motion for AnimateTransform {
     fn animate(&self, world: &mut World, time: f32) {
+        let from = self.from.to_transform(world, time);
+        let to = self.to.to_transform(world, time);
+
         let object = world.objects.get_mut(&self.object_id).unwrap();
 
-        object.transform = Transform {
-            position: time * (self.to.position - self.from.position.to_vec2())
-                + self.from.position.to_vec2(),
-            scale: time * (self.to.scale - self.from.scale) + self.from.scale,
-            rotation: time * (self.to.rotation - self.from.rotation) + self.from.rotation,
-            anchor: time * (self.to.anchor - self.from.anchor.to_vec2())
-                + self.from.anchor.to_vec2(),
+        object.transform = ObjectTransform {
+            position: time * (to.position - from.position.to_vec2()) + from.position.to_vec2(),
+            scale: time * (to.scale - from.scale) + from.scale,
+            rotation: time * (to.rotation - from.rotation) + from.rotation,
+            anchor: time * (to.anchor - from.anchor.to_vec2()) + from.anchor.to_vec2(),
         };
     }
 }
+
+pub struct SetTransform {
+    pub object_id: usize,
+    pub transform: DynamicTransform,
+}
+
+impl Motion for SetTransform {
+    fn animate(&self, world: &mut World, time: f32) {
+        let transform = self.transform.to_transform(world, time);
+        let object = world.objects.get_mut(&self.object_id).unwrap();
+
+        object.transform = transform;
+    }
+}
+
+pub struct Rotate {
+    pub object_id: usize,
+    pub around: DynamicVector,
+    pub from: DynamicValue,
+    pub to: DynamicValue,
+}
+
+impl Motion for Rotate {
+    fn animate(&self, world: &mut World, time: f32) {
+        let from = self.from.value(world);
+        let to = self.to.value(world);
+
+        let around = self.around.to_pos2(world);
+
+        let object = world.objects.get_mut(&self.object_id).unwrap();
+
+        let rotation = time * (to - from) + from;
+
+        object.transform.position =
+            rotate_vec_around_vector(object.transform.position, rotation, around);
+    }
+}
+
+// pub struct Transform {
+//     pub object_id: ObjectId,
+//     pub transform: ObjectTransform,
+// }
+//
+// impl Motion for Transform {
+//     fn animate(&self, world: &mut World, time: f32) {
+//         let object = world.objects.get_mut(&self.object_id).unwrap();
+//
+//         object.transform = self.transform;
+//     }
+// }
 
 pub struct AddObject {
     pub object_id: usize,
@@ -158,69 +206,66 @@ impl Motion for AddObject {
 }
 
 // Set variable to current time,
-pub struct SyncVariableWithTime {
+pub struct SetVariable {
     pub var: Variable,
 }
 
-impl Motion for SyncVariableWithTime {
+impl Motion for SetVariable {
     fn animate(&self, world: &mut World, time: f32) {
         world.update_variable(self.var, time);
     }
 }
 
-pub struct SetVariable {
-    pub ident: Variable,
-    pub value: f32,
-}
-
-impl Motion for SetVariable {
-    fn animate(&self, world: &mut World, _time: f32) {
-        world.update_variable(self.ident, self.value);
-    }
-}
-
-struct VariableSetter<M: Fn(&World, f32) -> f32> {
-    pub ident: Variable,
-    pub motion: M,
-}
-
-impl<M: Fn(&World, f32) -> f32> Motion for VariableSetter<M> {
-    fn animate(&self, world: &mut World, time: f32) {
-        let value = (self.motion)(world, time);
-
-        world.update_variable(self.ident, value);
-    }
-}
-
-// pub struct FadeIn {
-//     pub object_id: usize,
+// pub struct VariableSetter<M: Fn(&World, f32) -> f32> {
+//     pub ident: Variable,
+//     pub motion: M,
 // }
 //
-// fn fade_in(world: &mut World, object_id: usize) {
-//     let mut object = world.objects.remove(&object_id).unwrap();
-//
-//     match &mut object.object_kind {
-//         ObjectKind::Model(ref mut model) => {
-//             let c = model.material.color;
-//             model.material.color =
-//                 Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (world.time * 255.0) as u8);
-//         }
-//         ObjectKind::Group(group) => {
-//             for child_id in group.iter() {
-//                 fade_in(world, *child_id);
-//             }
-//         }
-//     }
-//
-//     world.objects.add(object_id, object, false);
-// }
-//
-// impl Motion for FadeIn {
+// impl<M: Fn(&World, f32) -> f32> Motion for VariableSetter<M> {
 //     fn animate(&self, world: &mut World, time: f32) {
-//         // FIXME: We should be able to animate the alpha value of the color.
-//         fade_in(world, self.object_id);
+//         let value = (self.motion)(world, time);
+//
+//         world.update_variable(self.ident, value);
 //     }
 // }
+
+pub struct FadeIn {
+    pub object_id: usize,
+}
+
+fn fade_in(world: &mut World, time: f32, object_id: usize) {
+    let mut object = world.objects.remove(&object_id).unwrap();
+
+    match &mut object.object_kind {
+        ObjectKind::Model(ref mut model) => {
+            if let Some(ref mut fill) = model.material.fill {
+                let c = fill.color;
+                fill.color =
+                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (time * 255.0) as u8);
+            }
+
+            if let Some(ref mut stroke) = model.material.stroke {
+                let c = stroke.color;
+                stroke.color =
+                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (time * 255.0) as u8);
+            }
+        }
+        ObjectKind::Group(group) => {
+            for child_id in group.iter() {
+                fade_in(world, time, *child_id);
+            }
+        }
+    }
+
+    world.objects.add(object_id, object, false);
+}
+
+impl Motion for FadeIn {
+    fn animate(&self, world: &mut World, time: f32) {
+        // FIXME: We should be able to animate the alpha value of the color.
+        fade_in(world, time, self.object_id);
+    }
+}
 
 #[cfg(test)]
 mod tests {

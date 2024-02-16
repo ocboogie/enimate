@@ -49,6 +49,7 @@ impl Builder for SceneBuilder {
     }
 
     fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
+        self.state.emulate_motion(motion.as_ref());
         let motion_id = self.add_motion(motion);
         self.root_motions
             .push((self.state.normalize_time(duration), motion_id));

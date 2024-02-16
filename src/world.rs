@@ -7,8 +7,8 @@ pub type Variable = usize;
 
 pub struct World<'a> {
     pub objects: &'a mut ObjectTree,
-    variables: HashMap<Variable, f32>,
-    variable_subscriptions: &'a HashMap<Variable, Vec<MotionId>>,
+    pub variables: HashMap<Variable, f32>,
+    // variable_trackers: &'a HashMap<Variable, Vec<MotionId>>,
     motions: &'a HashMap<MotionId, Box<dyn Motion>>,
 }
 
@@ -16,12 +16,12 @@ impl<'a> World<'a> {
     pub fn new(
         objects: &'a mut ObjectTree,
         motions: &'a HashMap<MotionId, Box<dyn Motion>>,
-        variable_subscriptions: &'a HashMap<Variable, Vec<MotionId>>,
+        // variable_trackers: &'a HashMap<Variable, Vec<MotionId>>,
     ) -> Self {
         Self {
             objects,
             variables: HashMap::new(),
-            variable_subscriptions,
+            // variable_trackers,
             motions,
         }
     }
@@ -29,19 +29,23 @@ impl<'a> World<'a> {
     pub fn update_variable(&mut self, variable: Variable, value: f32) {
         self.variables.insert(variable, value);
 
-        // TODO: cloned() is probably not necessary here.
-        // Although, then the alternative is to remove the subscriptions from the list.
-        if let Some(subscriptions) = self.variable_subscriptions.get(&variable).cloned() {
-            for motion in subscriptions {
-                self.play_at(motion, value);
-            }
-        }
+        // if let Some(trackers) = self.variable_trackers.remove(&variable) {
+        //     for motion in &trackers {
+        //         self.play_at(*motion, value);
+        //     }
+        //
+        //     self.variable_trackers.insert(variable, trackers);
+        // }
     }
 
     pub fn update_variables(&mut self, variables: &HashMap<Variable, f32>) {
         for (variable, value) in variables {
             self.update_variable(*variable, *value);
         }
+    }
+
+    pub fn get_variable(&self, variable: Variable) -> f32 {
+        *self.variables.get(&variable).expect("Variable not found")
     }
 
     pub fn play(&mut self, motion: MotionId) {

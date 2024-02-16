@@ -70,8 +70,8 @@ impl<'a> AnimationBuilder<'a> {
     pub fn translate(mut self, end: egui::Pos2) -> Self {
         let a = AnimateTransform {
             object_id: self.object_id,
-            from: self.object().transform,
-            to: self.object().transform.with_position(end),
+            from: self.object().transform.into(),
+            to: self.object().transform.with_position(end).into(),
         };
         self.animations.push(Box::new(a));
         self
@@ -86,8 +86,8 @@ impl<'a> AnimationBuilder<'a> {
         let target_pos = pos.position(self.object_id, self.state);
         let a = AnimateTransform {
             object_id: self.object_id,
-            from: self.object().transform,
-            to: self.object().transform.with_position(target_pos),
+            from: self.object().transform.into(),
+            to: self.object().transform.with_position(target_pos).into(),
         };
         self.animations.push(Box::new(a));
 
@@ -97,8 +97,8 @@ impl<'a> AnimationBuilder<'a> {
     pub fn rotate(mut self, rotation: f32) -> Self {
         let a = AnimateTransform {
             object_id: self.object_id,
-            from: self.object().transform,
-            to: self.object().transform.with_rotation(rotation),
+            from: self.object().transform.into(),
+            to: self.object().transform.with_rotation(rotation).into(),
         };
         self.animations.push(Box::new(a));
         self
@@ -107,8 +107,8 @@ impl<'a> AnimationBuilder<'a> {
     pub fn scale(mut self, scale: f32) -> Self {
         let a = AnimateTransform {
             object_id: self.object_id,
-            from: self.object().transform,
-            to: self.object().transform.with_scale(scale),
+            from: self.object().transform.into(),
+            to: self.object().transform.with_scale(scale).into(),
         };
         self.animations.push(Box::new(a));
         self

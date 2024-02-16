@@ -26,15 +26,23 @@ pub enum VerticalAlignment {
 }
 
 pub struct Alignment {
-    pub target: ObjectId,
+    pub target: Option<ObjectId>,
     pub horizontal: HorizontalAlignment,
     pub vertical: VerticalAlignment,
 }
 
 impl Alignment {
-    pub fn new(target: ObjectId) -> Self {
+    pub fn source() -> Self {
         Self {
-            target,
+            target: None,
+            horizontal: HorizontalAlignment::Center,
+            vertical: VerticalAlignment::Center,
+        }
+    }
+
+    pub fn target(target: ObjectId) -> Self {
+        Self {
+            target: Some(target),
             horizontal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
         }
@@ -68,21 +76,22 @@ impl Alignment {
 
 impl Positioner for Alignment {
     fn position(&self, source: ObjectId, state: &BuilderState) -> Pos2 {
-        let source_bb = state.objects.local_bounding_box(source);
-        let target_bb = state.objects.local_bounding_box(self.target);
+        let target_bb = state
+            .objects
+            .local_bounding_box(self.target.unwrap_or(source));
 
         let x = match self.horizontal {
-            HorizontalAlignment::Left => target_bb.left(),
+            HorizontalAlignment::Left => target_bb.min.x,
             HorizontalAlignment::Center => target_bb.center().x,
-            HorizontalAlignment::Right => target_bb.right(),
+            HorizontalAlignment::Right => target_bb.max.x,
         };
 
         let y = match self.vertical {
-            VerticalAlignment::Top => target_bb.top(),
+            VerticalAlignment::Top => target_bb.min.y,
             VerticalAlignment::Center => target_bb.center().y,
-            VerticalAlignment::Bottom => target_bb.bottom(),
+            VerticalAlignment::Bottom => target_bb.max.y,
         };
 
-        Pos2::new(x, y) - source_bb.center().to_vec2()
+        Pos2::new(x, y)
     }
 }
