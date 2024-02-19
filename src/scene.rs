@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    motion::{Motion, MotionId, NoOp},
+    motion::{Motion, MotionId, Wait},
     object_tree::ObjectTree,
     world::{Variable, World},
 };
@@ -16,7 +16,7 @@ impl Scene {
     pub fn null() -> Self {
         let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
         let root: MotionId = rand::random::<usize>();
-        motions.insert(root, Box::new(NoOp));
+        motions.insert(root, Box::new(Wait));
 
         Self {
             root,

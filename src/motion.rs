@@ -17,22 +17,22 @@ pub trait Motion: MotionUi {
     fn animate(&self, world: &mut World, time: f32);
 }
 
-pub struct NoOp;
+pub struct Wait;
 
-impl Motion for NoOp {
+impl Motion for Wait {
     fn animate(&self, _world: &mut World, _time: f32) {}
 }
 
-pub struct Sequence {
+pub struct Sequence(
     /// All the durations must add up to 1.0.
-    pub motions: Vec<(f32, MotionId)>,
-}
+    pub Vec<(MotionId, f32)>,
+);
 
 impl Motion for Sequence {
     fn animate(&self, world: &mut World, time: f32) {
         let mut current_time = 0.0;
 
-        for (duration, motion) in &self.motions {
+        for (motion, duration) in &self.0 {
             let adusted_time = (time - current_time) / duration;
 
             if adusted_time < 0.0 {
@@ -45,15 +45,31 @@ impl Motion for Sequence {
     }
 }
 
-pub struct Parallel {
+pub struct Concurrently {
     /// Order matters!
     pub motions: Vec<MotionId>,
 }
 
-impl Motion for Parallel {
+impl Motion for Concurrently {
     fn animate(&self, world: &mut World, time: f32) {
         for motion in &self.motions {
             world.play_at(*motion, time);
+        }
+    }
+}
+
+pub struct ConcurrentlyWithDurations(pub Vec<(MotionId, f32)>);
+
+impl Motion for ConcurrentlyWithDurations {
+    fn animate(&self, world: &mut World, time: f32) {
+        for (motion, duration) in &self.0 {
+            let adjusted_time = time / duration;
+
+            if adjusted_time < 0.0 {
+                return;
+            }
+
+            world.play_at(*motion, adjusted_time.min(1.0));
         }
     }
 }

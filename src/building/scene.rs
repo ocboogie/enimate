@@ -7,7 +7,7 @@ use crate::{
 
 pub struct SceneBuilder {
     state: BuilderState,
-    root_motions: Vec<(f32, MotionId)>,
+    root_motions: Vec<(MotionId, f32)>,
 }
 
 impl SceneBuilder {
@@ -23,9 +23,7 @@ impl SceneBuilder {
         let scene_length = self.state.scene_length;
         let sequence_id = rand::random::<ObjectId>();
 
-        let sequence = Sequence {
-            motions: self.root_motions,
-        };
+        let sequence = Sequence(self.root_motions);
 
         let time_converter = Keyframe {
             from_min: 0.0,
@@ -52,7 +50,7 @@ impl Builder for SceneBuilder {
         self.state.emulate_motion(motion.as_ref());
         let motion_id = self.add_motion(motion);
         self.root_motions
-            .push((self.state.normalize_time(duration), motion_id));
+            .push((motion_id, self.state.normalize_time(duration)));
         motion_id
     }
 }

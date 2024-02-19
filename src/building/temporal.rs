@@ -6,48 +6,6 @@ use crate::{
 use super::{Builder, BuilderState, Positioner};
 
 #[must_use]
-pub struct ParallelBuilder<'a> {
-    pub state: &'a mut BuilderState,
-    pub motions: Vec<MotionId>,
-    pub duration: f32,
-}
-
-impl<'a> Builder for ParallelBuilder<'a> {
-    fn state(&mut self) -> &mut BuilderState {
-        &mut self.state
-    }
-
-    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
-        let motion_id = self.add_motion(motion);
-
-        self.motions.push(motion_id);
-        self.duration = self.duration.max(duration);
-
-        motion_id
-    }
-}
-
-#[must_use]
-pub struct SequenceBuilder<'a> {
-    pub state: &'a mut BuilderState,
-    pub motions: Vec<(f32, MotionId)>,
-}
-
-impl Builder for SequenceBuilder<'_> {
-    fn state(&mut self) -> &mut BuilderState {
-        self.state
-    }
-
-    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
-        let motion_id = self.add_motion(motion);
-
-        self.motions.push((duration, motion_id));
-
-        motion_id
-    }
-}
-
-#[must_use]
 pub struct AnimationBuilder<'a> {
     object_id: ObjectId,
     pub animations: Vec<Box<dyn Motion>>,

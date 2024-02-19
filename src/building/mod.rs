@@ -7,16 +7,18 @@ use crate::{
 use std::collections::HashMap;
 
 mod builder;
+mod component;
 mod object;
 mod scene;
 mod spatial;
-mod temporal;
+// mod temporal;
 
 pub use builder::*;
+pub use component::*;
 pub use object::*;
 pub use scene::*;
 pub use spatial::*;
-pub use temporal::*;
+// pub use temporal::*;
 
 pub struct BuilderState {
     pub motions: HashMap<MotionId, Box<dyn Motion>>,

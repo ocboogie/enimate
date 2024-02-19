@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use crate::{
     motion::{
-        AddObject, AnimateTransform, FadeIn, Keyframe, Motion, MotionId, NoOp, Parallel, Rotate,
-        Sequence, SetTransform, SetVariable, Trigger,
+        AddObject, AnimateTransform, Concurrently, ConcurrentlyWithDurations, FadeIn, Keyframe,
+        Motion, MotionId, Rotate, Sequence, SetTransform, SetVariable, Trigger, Wait,
     },
     scene::Scene,
     world::World,
@@ -43,11 +43,22 @@ pub fn fixme(ui: &mut egui::Ui, scene: &mut Scene, motion_id: MotionId) {
     scene.motions.insert(motion_id, motion);
 }
 
-impl MotionUi for Parallel {
+impl MotionUi for Concurrently {
     fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
-        ui.label("Parallel");
-        ui.indent("Parallel", |ui| {
+        ui.label("Concurrently");
+        ui.indent("Concurrently", |ui| {
             for id in &mut self.motions {
+                fixme(ui, scene, *id);
+            }
+        });
+    }
+}
+
+impl MotionUi for ConcurrentlyWithDurations {
+    fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
+        ui.label("ConcurrentlyWithDurations");
+        ui.indent("ConcurrentlyWithDurations", |ui| {
+            for (id, _) in &mut self.0 {
                 fixme(ui, scene, *id);
             }
         });
@@ -58,7 +69,7 @@ impl MotionUi for Sequence {
     fn ui(&mut self, ui: &mut egui::Ui, scene: &mut Scene) {
         ui.label("Sequence");
         ui.indent("Sequence", |ui| {
-            for (duration, id) in &mut self.motions {
+            for (id, duration) in &mut self.0 {
                 ui.label(format!("Duration: {}", duration));
                 fixme(ui, scene, *id);
             }
@@ -132,7 +143,7 @@ impl MotionGenericUi for AnimateTransform {
 //     }
 // }
 
-impl MotionUi for NoOp {
+impl MotionUi for Wait {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Scene) {
         ui.label("Noop");
     }

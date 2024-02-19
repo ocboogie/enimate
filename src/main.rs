@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use building::{Alignment, Builder, SceneBuilder};
+use building::{Alignment, Builder, Handle, SceneBuilder};
 use dynamics::{DynamicTransform, DynamicValue};
 // use component::Component;
 use egui::{pos2, Color32, Pos2, Stroke, Vec2};
@@ -9,7 +9,10 @@ use lyon::{
     path::{traits::PathBuilder, Path, Winding},
 };
 
-use motion::{AddObject, Motion, MotionId, Parallel, Rotate, Sequence, SetTransform, SetVariable};
+use motion::{
+    AddObject, Concurrently, ConcurrentlyWithDurations, FadeIn, Motion, MotionId, Rotate, Sequence,
+    SetTransform, SetVariable, Wait,
+};
 // use building::{Builder, SceneBuilder};
 use motion_ui::fixme;
 use object::{
@@ -18,6 +21,7 @@ use object::{
 use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
+use shapes::Circle;
 use world::World;
 
 mod building;
@@ -30,6 +34,7 @@ mod object;
 mod object_tree;
 mod renderer;
 mod scene;
+mod shapes;
 mod utils;
 mod world;
 
@@ -326,7 +331,7 @@ fn mouse_input() -> Scene {
 
     motions.insert(
         root,
-        Box::new(Parallel {
+        Box::new(Concurrently {
             motions: vec![add_object, update_pos],
         }),
     );
@@ -340,47 +345,76 @@ fn mouse_input() -> Scene {
 pub fn building() -> Scene {
     let mut builder = SceneBuilder::new(5.0);
 
-    builder
-        .circle(10.0, FillMaterial::new(Color32::RED).into())
-        .add();
+    builder.add(Circle {
+        radius: 50.0,
+        center: pos2(0.0, 0.0),
+        material: FillMaterial::new(Color32::RED).into(),
+    });
 
     builder.finish()
 }
 
 fn animations() -> Scene {
-    let mut scene_builder = SceneBuilder::new(5.0);
+    let mut b = SceneBuilder::new(5.0);
 
-    scene_builder.parallel(|p| {
-        for i in 0..9 {
-            p.sequence(|s| {
-                s.delay(0.1 * i as f32);
-                s.rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
-                    .with_position(pos2(
-                        (i % 3) as f32 * 100.0 - 100.0,
-                        (i / 3) as f32 * 100.0 - 100.0,
-                    ))
-                    .animate(0.3, |a| a.fade_in());
-            });
-        }
-    });
+    let mut motions: Vec<(Box<dyn Motion>, f32)> = Vec::new();
 
-    scene_builder.finish()
+    for i in 0..9 {
+        let circle = b.add(Circle {
+            radius: 50.0,
+            center: pos2(
+                (i % 3) as f32 * 100.0 - 100.0,
+                (i / 3) as f32 * 100.0 - 100.0,
+            ),
+            material: FillMaterial::new(Color32::RED).into(),
+        });
+
+        motions.push(b.sequence(vec![
+            (Box::new(Wait), 0.1 * i as f32),
+            (
+                Box::new(FadeIn {
+                    object_id: circle.id(),
+                }),
+                0.3,
+            ),
+        ]));
+    }
+
+    b.play_concurrently(motions);
+
+    b.finish()
+
+    // b.parallel(|p| {
+    //     for i in 0..9 {
+    //         p.sequence(|s| {
+    //             s.delay(0.1 * i as f32);
+    //             s.rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
+    //                 .with_position(pos2(
+    //                     (i % 3) as f32 * 100.0 - 100.0,
+    //                     (i / 3) as f32 * 100.0 - 100.0,
+    //                 ))
+    //                 .animate(0.3, |a| a.fade_in());
+    //         });
+    //     }
+    // });
+    //
+    // scene_builder.finish()
 }
 
 fn alignment() -> Scene {
     let mut b = SceneBuilder::new(5.0);
 
-    let moving_rect = b
-        .rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
-        // .with_position(pos2(25.0, 25.0))
-        .with_position(pos2(0.0, 50.0))
-        .animate(0.3, |a| a.translate(pos2(0.0, -50.0)));
-
-    b.delay(0.3);
-
-    let moving_circle = b
-        .circle(25.0, FillMaterial::new(Color32::BLUE).into())
-        .animate(0.3, |a| a.move_to(Alignment::target(moving_rect).left()));
+    // let moving_rect = b
+    //     .rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
+    //     // .with_position(pos2(25.0, 25.0))
+    //     .with_position(pos2(0.0, 50.0))
+    //     .animate(0.3, |a| a.translate(pos2(0.0, -50.0)));
+    //
+    // b.wait(0.3);
+    //
+    // let moving_circle = b
+    //     .circle(25.0, FillMaterial::new(Color32::BLUE).into())
+    //     .animate(0.3, |a| a.move_to(Alignment::target(moving_rect).left()));
     // .with_position(pos2(-50.0, 50.0))
 
     b.finish()
