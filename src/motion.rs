@@ -1,209 +1,113 @@
 use egui::Color32;
 
-use crate::dynamics::{DynamicTransform, DynamicValue, DynamicVector};
+use crate::animation::{Animation, GenericAnimation, Time};
+use crate::dynamics::{DynamicPos, DynamicTransform, DynamicValue};
 use crate::object::{Object, ObjectId, ObjectKind};
 
-use crate::motion_ui::MotionUi;
 use crate::object::Transform as ObjectTransform;
 use crate::utils::rotate_vec_around_vector;
 use crate::world::{Variable, World};
 
 pub type MotionId = usize;
 
+pub type Alpha = f32;
+
 /// A motion is the most basic momvement primitive. It is a function that takes a world
 /// and updates the world, adding objects, mutating them, or animating them. The time is a value
 /// between 0 and 1.
-pub trait Motion: MotionUi {
-    fn animate(&self, world: &mut World, time: f32);
+pub trait Motion {
+    fn animate(&self, world: &mut World, alpha: Alpha);
+}
+
+impl Motion for Box<dyn Motion> {
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        self.animate(world, alpha);
+    }
 }
 
 pub struct Wait;
 
 impl Motion for Wait {
-    fn animate(&self, _world: &mut World, _time: f32) {}
+    fn animate(&self, _world: &mut World, _alpha: Alpha) {}
 }
 
 pub struct Sequence(
     /// All the durations must add up to 1.0.
-    pub Vec<(MotionId, f32)>,
+    pub Vec<GenericAnimation>,
 );
 
 impl Motion for Sequence {
-    fn animate(&self, world: &mut World, time: f32) {
-        let mut current_time = 0.0;
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        // FIXME:
+        let mut current_alpha = 0.0;
 
-        for (motion, duration) in &self.0 {
-            let adusted_time = (time - current_time) / duration;
+        for animation in &self.0 {
+            let duration = animation.duration();
 
-            if adusted_time < 0.0 {
+            let adusted_alpha = (alpha - current_alpha) / duration;
+
+            if adusted_alpha < 0.0 {
                 return;
             }
 
-            world.play_at(*motion, adusted_time.min(1.0));
-            current_time += duration;
+            animation.animate(world, adusted_alpha.min(1.0));
+            current_alpha += duration;
         }
     }
 }
 
-pub struct Concurrently {
+pub struct Concurrently(
     /// Order matters!
-    pub motions: Vec<MotionId>,
-}
+    pub Vec<GenericAnimation>,
+);
 
 impl Motion for Concurrently {
-    fn animate(&self, world: &mut World, time: f32) {
-        for motion in &self.motions {
-            world.play_at(*motion, time);
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        for animation in &self.0 {
+            animation.animate(world, alpha);
         }
     }
 }
 
-pub struct ConcurrentlyWithDurations(pub Vec<(MotionId, f32)>);
-
-impl Motion for ConcurrentlyWithDurations {
-    fn animate(&self, world: &mut World, time: f32) {
-        for (motion, duration) in &self.0 {
-            let adjusted_time = time / duration;
-
-            if adjusted_time < 0.0 {
-                return;
-            }
-
-            world.play_at(*motion, adjusted_time.min(1.0));
-        }
-    }
-}
-
-pub struct Trigger {
-    pub time: f32,
-    pub motion: MotionId,
-}
-
-impl Trigger {
-    pub fn new(time: f32, motion: MotionId) -> Self {
-        Self { time, motion }
-    }
-}
-
-impl Motion for Trigger {
-    fn animate(&self, world: &mut World, time: f32) {
-        if time >= self.time {
-            world.play_at(self.motion, 1.0);
-        }
-    }
-}
-
-pub struct Keyframe {
-    pub from_min: f32,
-    pub from_max: f32,
-    pub to_min: f32,
-    pub to_max: f32,
-
-    pub motion: MotionId,
-}
-
-impl Keyframe {
-    pub fn new(from_min: f32, from_max: f32, to_min: f32, to_max: f32, motion: MotionId) -> Self {
-        Self {
-            from_min,
-            from_max,
-            to_min,
-            to_max,
-            motion,
-        }
-    }
-}
-
-impl Motion for Keyframe {
-    fn animate(&self, world: &mut World, time: f32) {
-        let mut adjusted_time = (time - self.from_min) / (self.from_max - self.from_min);
-
-        // We don't want to run the animate function because, for example, the AddObject motion
-        // relies on not being run if the time is out of bounds.
-        if adjusted_time < 0.0 {
-            return;
-        }
-
-        // We want to clamp the time to 1.0, so that once we've pasted the end of the motion,
-        // it still runs, ensuring AddObject is run, and it doesn't screw up animations like
-        // AnimateTransform.
-        adjusted_time = adjusted_time.min(1.0);
-
-        adjusted_time *= (self.to_max - self.to_min) + self.to_min;
-
-        world.play_at(self.motion, adjusted_time);
-    }
-}
-
-pub struct AnimateTransform {
-    pub object_id: usize,
-    pub from: DynamicTransform,
-    pub to: DynamicTransform,
-}
-
-impl Motion for AnimateTransform {
-    fn animate(&self, world: &mut World, time: f32) {
-        let from = self.from.to_transform(world, time);
-        let to = self.to.to_transform(world, time);
-
-        let object = world.objects.get_mut(&self.object_id).unwrap();
-
-        object.transform = ObjectTransform {
-            position: time * (to.position - from.position.to_vec2()) + from.position.to_vec2(),
-            scale: time * (to.scale - from.scale) + from.scale,
-            rotation: time * (to.rotation - from.rotation) + from.rotation,
-            anchor: time * (to.anchor - from.anchor.to_vec2()) + from.anchor.to_vec2(),
-        };
-    }
-}
-
-pub struct SetTransform {
-    pub object_id: usize,
-    pub transform: DynamicTransform,
-}
-
-impl Motion for SetTransform {
-    fn animate(&self, world: &mut World, time: f32) {
-        let transform = self.transform.to_transform(world, time);
-        let object = world.objects.get_mut(&self.object_id).unwrap();
-
-        object.transform = transform;
-    }
-}
-
-pub struct Rotate {
-    pub object_id: usize,
-    pub around: DynamicVector,
-    pub from: DynamicValue,
-    pub to: DynamicValue,
-}
-
-impl Motion for Rotate {
-    fn animate(&self, world: &mut World, time: f32) {
-        let from = self.from.value(world);
-        let to = self.to.value(world);
-
-        let around = self.around.to_pos2(world);
-
-        let object = world.objects.get_mut(&self.object_id).unwrap();
-
-        let rotation = time * (to - from) + from;
-
-        object.transform.position =
-            rotate_vec_around_vector(object.transform.position, rotation, around);
-    }
-}
-
-// pub struct Transform {
-//     pub object_id: ObjectId,
-//     pub transform: ObjectTransform,
+// pub struct Keyframe {
+//     pub from_min: Time,
+//     pub from_max: f32,
+//     pub to_min: f32,
+//     pub to_max: f32,
+//
+//     pub motion: MotionId,
 // }
 //
-// impl Motion for Transform {
-//     fn animate(&self, world: &mut World, time: f32) {
-//         let object = world.objects.get_mut(&self.object_id).unwrap();
+// impl Keyframe {
+//     pub fn new(from_min: f32, from_max: f32, to_min: f32, to_max: f32, motion: MotionId) -> Self {
+//         Self {
+//             from_min,
+//             from_max,
+//             to_min,
+//             to_max,
+//             motion,
+//         }
+//     }
+// }
 //
-//         object.transform = self.transform;
+// impl Motion for Keyframe {
+//     fn animate(&self, world: &mut World, time: Alpha) {
+//         let mut adjusted_time = (time - self.from_min) / (self.from_max - self.from_min);
+//
+//         // We don't want to run the animate function because, for example, the AddObject motion
+//         // relies on not being run if the time is out of bounds.
+//         if adjusted_time < 0.0 {
+//             return;
+//         }
+//
+//         // We want to clamp the time to 1.0, so that once we've pasted the end of the motion,
+//         // it still runs, ensuring AddObject is run, and it doesn't screw up animations like
+//         // AnimateTransform.
+//         adjusted_time = adjusted_time.min(1.0);
+//
+//         adjusted_time *= (self.to_max - self.to_min) + self.to_min;
+//
+//         world.play_at(self.motion, adjusted_time);
 //     }
 // }
 
@@ -214,42 +118,18 @@ pub struct AddObject {
 }
 
 impl Motion for AddObject {
-    fn animate(&self, world: &mut World, time: f32) {
+    fn animate(&self, world: &mut World, _alpha: Alpha) {
         world
             .objects
             .add(self.object_id, self.object.clone(), self.rooted);
     }
 }
 
-// Set variable to current time,
-pub struct SetVariable {
-    pub var: Variable,
-}
-
-impl Motion for SetVariable {
-    fn animate(&self, world: &mut World, time: f32) {
-        world.update_variable(self.var, time);
-    }
-}
-
-// pub struct VariableSetter<M: Fn(&World, f32) -> f32> {
-//     pub ident: Variable,
-//     pub motion: M,
-// }
-//
-// impl<M: Fn(&World, f32) -> f32> Motion for VariableSetter<M> {
-//     fn animate(&self, world: &mut World, time: f32) {
-//         let value = (self.motion)(world, time);
-//
-//         world.update_variable(self.ident, value);
-//     }
-// }
-
 pub struct FadeIn {
     pub object_id: usize,
 }
 
-fn fade_in(world: &mut World, time: f32, object_id: usize) {
+fn fade_in(world: &mut World, alpha: Alpha, object_id: usize) {
     let mut object = world.objects.remove(&object_id).unwrap();
 
     match &mut object.object_kind {
@@ -257,18 +137,18 @@ fn fade_in(world: &mut World, time: f32, object_id: usize) {
             if let Some(ref mut fill) = model.material.fill {
                 let c = fill.color;
                 fill.color =
-                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (time * 255.0) as u8);
+                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (alpha * 255.0) as u8);
             }
 
             if let Some(ref mut stroke) = model.material.stroke {
                 let c = stroke.color;
                 stroke.color =
-                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (time * 255.0) as u8);
+                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (alpha * 255.0) as u8);
             }
         }
         ObjectKind::Group(group) => {
             for child_id in group.iter() {
-                fade_in(world, time, *child_id);
+                fade_in(world, alpha, *child_id);
             }
         }
     }
@@ -277,9 +157,9 @@ fn fade_in(world: &mut World, time: f32, object_id: usize) {
 }
 
 impl Motion for FadeIn {
-    fn animate(&self, world: &mut World, time: f32) {
+    fn animate(&self, world: &mut World, alpha: f32) {
         // FIXME: We should be able to animate the alpha value of the color.
-        fade_in(world, time, self.object_id);
+        fade_in(world, alpha, self.object_id);
     }
 }
 

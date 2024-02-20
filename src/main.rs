@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use building::{Alignment, Builder, Handle, SceneBuilder};
+use animation::MotionAnimation;
+// use building::{Alignment, Builder, Handle, SceneBuilder};
 use dynamics::{DynamicTransform, DynamicValue};
 // use component::Component;
 use egui::{pos2, Color32, Pos2, Stroke, Vec2};
@@ -9,32 +10,30 @@ use lyon::{
     path::{traits::PathBuilder, Path, Winding},
 };
 
-use motion::{
-    AddObject, Concurrently, ConcurrentlyWithDurations, FadeIn, Motion, MotionId, Rotate, Sequence,
-    SetTransform, SetVariable, Wait,
-};
+use motion::{AddObject, Concurrently, FadeIn, Motion, MotionId, Sequence, Wait};
 // use building::{Builder, SceneBuilder};
-use motion_ui::fixme;
+// use motion_ui::fixme;
 use object::{
     FillMaterial, Material, Model, Object, ObjectId, ObjectKind, StrokeMaterial, Transform,
 };
 use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
-use shapes::Circle;
+// use shapes::Circle;
 use world::World;
 
-mod building;
+// mod building;
 // mod component;
 mod dynamics;
 mod mesh;
 mod motion;
-mod motion_ui;
+// mod motion_ui;
+mod animation;
 mod object;
 mod object_tree;
 mod renderer;
 mod scene;
-mod shapes;
+// mod shapes;
 mod utils;
 mod world;
 
@@ -60,19 +59,19 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let dt = ctx.input(|i| i.stable_dt) as f32;
 
-        if self.play && self.current_time < self.scene().length {
+        if self.play && self.current_time < self.scene().length() {
             self.current_time += dt;
         }
 
-        if self.current_time >= self.scene().length {
+        if self.current_time >= self.scene().length() {
             self.play = false;
-            self.current_time = self.scene().length;
+            self.current_time = self.scene().length();
         }
 
         ctx.request_repaint();
 
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            if self.current_time >= self.scene().length {
+            if self.current_time >= self.scene().length() {
                 self.current_time = 0.0;
                 self.play = true;
             } else {
@@ -96,15 +95,15 @@ impl eframe::App for App {
                 });
         });
 
-        egui::SidePanel::left("scene_panel").show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading("Scene Tree");
-                ui.separator();
-                let root = self.scene().root;
-                fixme(ui, self.scene_mut(), root);
-                // self.scene.root_mut().ui(ui, &mut self.scene);
-            });
-        });
+        // egui::SidePanel::left("scene_panel").show(ctx, |ui| {
+        //     egui::ScrollArea::vertical().show(ui, |ui| {
+        //         ui.heading("Scene Tree");
+        //         ui.separator();
+        //         let root = self.scene().root;
+        //         fixme(ui, self.scene_mut(), root);
+        //         // self.scene.root_mut().ui(ui, &mut self.scene);
+        //     });
+        // });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label(format!("Time: {}", self.current_time));
@@ -119,7 +118,7 @@ impl eframe::App for App {
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                let length = self.scene().length;
+                let length = self.scene().length();
 
                 ui.add(
                     egui::Slider::new(&mut self.current_time, 0.0..=length).clamp_to_range(true),
@@ -187,11 +186,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Box::new(App::new(
                 cc,
                 vec![
-                    ("Mouse input", mouse_input()),
+                    // ("Mouse input", mouse_input()),
                     ("Stroke", stroke()),
-                    ("Building", building()),
-                    ("Animations", animations()),
-                    ("Alignment", alignment()),
+                    // ("Building", building()),
+                    // ("Animations", animations()),
+                    // ("Alignment", alignment()),
                     // ("Variables", variables()),
                 ],
             ))
@@ -202,9 +201,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn stroke() -> Scene {
-    let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
-    let root: MotionId = rand::random::<usize>();
-
     let mut builder = Path::builder();
     builder.begin(point(0.0, 0.0));
     builder.line_to(point(1.0, 2.0));
@@ -213,25 +209,31 @@ fn stroke() -> Scene {
     builder.close();
     let path = builder.build();
 
-    motions.insert(
-        root,
-        Box::new(AddObject {
-            object: Object {
-                object_kind: ObjectKind::Model(Model {
-                    path,
-                    material: Material {
-                        fill: Some(FillMaterial::new(Color32::RED)),
-                        stroke: Some(StrokeMaterial::new(Color32::BLUE, 0.1)),
-                    },
-                }),
-                transform: Transform::default().with_scale(100.0),
+    let seq = Sequence(vec![
+        Box::new(MotionAnimation {
+            duration: 0.0,
+            motion: AddObject {
+                object: Object {
+                    object_kind: ObjectKind::Model(Model {
+                        path,
+                        material: Material {
+                            stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
+                            fill: Some(FillMaterial::new(Color32::WHITE)),
+                        },
+                    }),
+                    transform: Transform::default().with_scale(50.0),
+                },
+                object_id: rand::random::<usize>(),
+                rooted: true,
             },
-            rooted: true,
-            object_id: 123,
         }),
-    );
+        Box::new(MotionAnimation {
+            duration: 5.0,
+            motion: Wait,
+        }),
+    ]);
 
-    Scene::new(motions, root, 2.0)
+    Scene(seq)
 }
 
 // fn variables() -> Scene {
@@ -288,134 +290,129 @@ fn stroke() -> Scene {
 //     Scene::new(motions, root, variables_subscriptions, 2.0)
 // }
 
-fn mouse_input() -> Scene {
-    let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
-    let mut variables_subscriptions: HashMap<usize, Vec<MotionId>> = HashMap::new();
+// fn mouse_input() -> Scene {
+//     let mut builder = Path::builder();
+//     builder.add_circle(point(0.0, 0.0), 10.0, Winding::Positive);
+//     let path = builder.build();
+//
+//     motions.insert(
+//         add_object,
+//         Box::new(AddObject {
+//             object: Object {
+//                 object_kind: ObjectKind::Model(Model {
+//                     path,
+//                     material: FillMaterial::new(Color32::RED).into(),
+//                 }),
+//                 transform: Transform::default().with_scale(1.0),
+//             },
+//             rooted: true,
+//             object_id: circle_id,
+//         }),
+//     );
+//
+//     let update_pos: MotionId = rand::random::<usize>();
+//     let mut transform: DynamicTransform = Transform::default().with_position(pos2(0.0, 0.0)).into();
+//
+//     transform.position.x = DynamicValue::Variable(0);
+//     transform.position.y = DynamicValue::Variable(1);
+//
+//     motions.insert(
+//         update_pos,
+//         Box::new(SetTransform {
+//             object_id: circle_id,
+//             transform,
+//         }),
+//     );
+//
+//     let root = rand::random::<usize>();
+//
+//     motions.insert(
+//         root,
+//         Box::new(Concurrently {
+//             motions: vec![add_object, update_pos],
+//         }),
+//     );
+//
+//     // variables_subscriptions.insert(0, vec![update_pos]);
+//     // variables_subscriptions.insert(1, vec![update_pos]);
+//
+//     Scene::new(motions, root, 2.0)
+// }
 
-    let mut builder = Path::builder();
-    builder.add_circle(point(0.0, 0.0), 10.0, Winding::Positive);
-    let path = builder.build();
-
-    let add_object: MotionId = rand::random::<usize>();
-    let circle_id: ObjectId = rand::random::<usize>();
-    motions.insert(
-        add_object,
-        Box::new(AddObject {
-            object: Object {
-                object_kind: ObjectKind::Model(Model {
-                    path,
-                    material: FillMaterial::new(Color32::RED).into(),
-                }),
-                transform: Transform::default().with_scale(1.0),
-            },
-            rooted: true,
-            object_id: circle_id,
-        }),
-    );
-
-    let update_pos: MotionId = rand::random::<usize>();
-    let mut transform: DynamicTransform = Transform::default().with_position(pos2(0.0, 0.0)).into();
-
-    transform.position.x = DynamicValue::Variable(0);
-    transform.position.y = DynamicValue::Variable(1);
-
-    motions.insert(
-        update_pos,
-        Box::new(SetTransform {
-            object_id: circle_id,
-            transform,
-        }),
-    );
-
-    let root = rand::random::<usize>();
-
-    motions.insert(
-        root,
-        Box::new(Concurrently {
-            motions: vec![add_object, update_pos],
-        }),
-    );
-
-    // variables_subscriptions.insert(0, vec![update_pos]);
-    // variables_subscriptions.insert(1, vec![update_pos]);
-
-    Scene::new(motions, root, 2.0)
-}
-
-pub fn building() -> Scene {
-    let mut builder = SceneBuilder::new(5.0);
-
-    builder.add(Circle {
-        radius: 50.0,
-        center: pos2(0.0, 0.0),
-        material: FillMaterial::new(Color32::RED).into(),
-    });
-
-    builder.finish()
-}
-
-fn animations() -> Scene {
-    let mut b = SceneBuilder::new(5.0);
-
-    let mut motions: Vec<(Box<dyn Motion>, f32)> = Vec::new();
-
-    for i in 0..9 {
-        let circle = b.add(Circle {
-            radius: 50.0,
-            center: pos2(
-                (i % 3) as f32 * 100.0 - 100.0,
-                (i / 3) as f32 * 100.0 - 100.0,
-            ),
-            material: FillMaterial::new(Color32::RED).into(),
-        });
-
-        motions.push(b.sequence(vec![
-            (Box::new(Wait), 0.1 * i as f32),
-            (
-                Box::new(FadeIn {
-                    object_id: circle.id(),
-                }),
-                0.3,
-            ),
-        ]));
-    }
-
-    b.play_concurrently(motions);
-
-    b.finish()
-
-    // b.parallel(|p| {
-    //     for i in 0..9 {
-    //         p.sequence(|s| {
-    //             s.delay(0.1 * i as f32);
-    //             s.rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
-    //                 .with_position(pos2(
-    //                     (i % 3) as f32 * 100.0 - 100.0,
-    //                     (i / 3) as f32 * 100.0 - 100.0,
-    //                 ))
-    //                 .animate(0.3, |a| a.fade_in());
-    //         });
-    //     }
-    // });
-    //
-    // scene_builder.finish()
-}
-
-fn alignment() -> Scene {
-    let mut b = SceneBuilder::new(5.0);
-
-    // let moving_rect = b
-    //     .rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
-    //     // .with_position(pos2(25.0, 25.0))
-    //     .with_position(pos2(0.0, 50.0))
-    //     .animate(0.3, |a| a.translate(pos2(0.0, -50.0)));
-    //
-    // b.wait(0.3);
-    //
-    // let moving_circle = b
-    //     .circle(25.0, FillMaterial::new(Color32::BLUE).into())
-    //     .animate(0.3, |a| a.move_to(Alignment::target(moving_rect).left()));
-    // .with_position(pos2(-50.0, 50.0))
-
-    b.finish()
-}
+// pub fn building() -> Scene {
+//     let mut builder = SceneBuilder::new(5.0);
+//
+//     builder.add(Circle {
+//         radius: 50.0,
+//         center: pos2(0.0, 0.0),
+//         material: FillMaterial::new(Color32::RED).into(),
+//     });
+//
+//     builder.finish()
+// }
+//
+// fn animations() -> Scene {
+//     let mut b = SceneBuilder::new(5.0);
+//
+//     let mut motions: Vec<(Box<dyn Motion>, f32)> = Vec::new();
+//
+//     for i in 0..9 {
+//         let circle = b.add(Circle {
+//             radius: 50.0,
+//             center: pos2(
+//                 (i % 3) as f32 * 100.0 - 100.0,
+//                 (i / 3) as f32 * 100.0 - 100.0,
+//             ),
+//             material: FillMaterial::new(Color32::RED).into(),
+//         });
+//
+//         motions.push(b.sequence(vec![
+//             (Box::new(Wait), 0.1 * i as f32),
+//             (
+//                 Box::new(FadeIn {
+//                     object_id: circle.id(),
+//                 }),
+//                 0.3,
+//             ),
+//         ]));
+//     }
+//
+//     b.play_concurrently(motions);
+//
+//     b.finish()
+//
+//     // b.parallel(|p| {
+//     //     for i in 0..9 {
+//     //         p.sequence(|s| {
+//     //             s.delay(0.1 * i as f32);
+//     //             s.rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
+//     //                 .with_position(pos2(
+//     //                     (i % 3) as f32 * 100.0 - 100.0,
+//     //                     (i / 3) as f32 * 100.0 - 100.0,
+//     //                 ))
+//     //                 .animate(0.3, |a| a.fade_in());
+//     //         });
+//     //     }
+//     // });
+//     //
+//     // scene_builder.finish()
+// }
+//
+// fn alignment() -> Scene {
+//     let mut b = SceneBuilder::new(5.0);
+//
+//     // let moving_rect = b
+//     //     .rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
+//     //     // .with_position(pos2(25.0, 25.0))
+//     //     .with_position(pos2(0.0, 50.0))
+//     //     .animate(0.3, |a| a.translate(pos2(0.0, -50.0)));
+//     //
+//     // b.wait(0.3);
+//     //
+//     // let moving_circle = b
+//     //     .circle(25.0, FillMaterial::new(Color32::BLUE).into())
+//     //     .animate(0.3, |a| a.move_to(Alignment::target(moving_rect).left()));
+//     // .with_position(pos2(-50.0, 50.0))
+//
+//     b.finish()
+// }
