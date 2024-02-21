@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use animation::MotionAnimation;
+use building::{Builder, SceneBuilder};
 // use building::{Alignment, Builder, Handle, SceneBuilder};
 use dynamics::{DynamicTransform, DynamicValue};
 // use component::Component;
@@ -10,7 +11,9 @@ use lyon::{
     path::{traits::PathBuilder, Path, Winding},
 };
 
-use motion::{AddObject, Concurrently, FadeIn, Motion, MotionId, Sequence, Wait};
+use motion::{
+    AddObject, Concurrently, EmbededScene, FadeIn, Motion, MotionId, Move, Sequence, Wait,
+};
 // use building::{Builder, SceneBuilder};
 // use motion_ui::fixme;
 use object::{
@@ -19,10 +22,10 @@ use object::{
 use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
-// use shapes::Circle;
+use shapes::Circle;
 use world::World;
 
-// mod building;
+mod building;
 // mod component;
 mod dynamics;
 mod mesh;
@@ -33,7 +36,8 @@ mod object;
 mod object_tree;
 mod renderer;
 mod scene;
-// mod shapes;
+mod shapes;
+mod trigger;
 mod utils;
 mod world;
 
@@ -189,9 +193,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // ("Mouse input", mouse_input()),
                     ("Stroke", stroke()),
                     // ("Building", building()),
-                    // ("Animations", animations()),
+                    ("Animations", animations()),
+                    ("Movement", movement()),
                     // ("Alignment", alignment()),
                     // ("Variables", variables()),
+                    ("Scenes", embedded_scenes()),
                 ],
             ))
         }),
@@ -234,6 +240,142 @@ fn stroke() -> Scene {
     ]);
 
     Scene(seq)
+}
+
+// fn animations() -> Scene {
+//     let mut builder = Path::builder();
+//     builder.begin(point(0.0, 0.0));
+//     builder.line_to(point(1.0, 2.0));
+//     builder.line_to(point(2.0, 0.0));
+//     builder.line_to(point(1.0, 1.0));
+//     builder.close();
+//     let path = builder.build();
+//
+//     let mut builder = SceneBuilder::new();
+//
+//     let object = builder.add_new_object(Object {
+//         object_kind: ObjectKind::Model(Model {
+//             path,
+//             material: Material {
+//                 stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
+//                 fill: Some(FillMaterial::new(Color32::WHITE)),
+//             },
+//         }),
+//         transform: Transform::default().with_scale(50.0),
+//     });
+//
+//     builder.play(
+//         (MotionAnimation {
+//             duration: 1.0,
+//             motion: FadeIn { object_id: object },
+//         }),
+//     );
+//
+//     builder.finish()
+// }
+
+fn animations() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let mut c = Concurrently(Vec::new());
+
+    for i in 0..9 {
+        let circle = b.add(Circle {
+            radius: 50.0,
+            center: pos2(
+                (i % 3) as f32 * 100.0 - 100.0,
+                (i / 3) as f32 * 100.0 - 100.0,
+            ),
+            material: FillMaterial::new(Color32::RED).into(),
+        });
+
+        let mut seq = Sequence::default();
+
+        seq.add(MotionAnimation {
+            duration: 0.1 * i as f32,
+            motion: Wait,
+        });
+        seq.add(MotionAnimation {
+            duration: 0.3,
+            motion: FadeIn { object_id: circle },
+        });
+        c.add(seq);
+    }
+
+    b.play(c);
+    b.play(MotionAnimation {
+        duration: 5.0,
+        motion: Wait,
+    });
+
+    b.finish()
+}
+
+fn movement() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let circle_a = b.add(Circle {
+        radius: 50.0,
+        center: pos2(0.0, 0.0),
+        material: FillMaterial::new(Color32::RED).into(),
+    });
+    let circle_b = b.add(Circle {
+        radius: 50.0,
+        center: pos2(0.0, 0.0),
+        material: FillMaterial::new(Color32::BLUE).into(),
+    });
+
+    let mut c = Concurrently::default();
+
+    c.add(MotionAnimation {
+        duration: 1.0,
+        motion: Move {
+            object_id: circle_a,
+            from: pos2(-50.0, 100.0).into(),
+            to: pos2(50.0, 100.0).into(),
+        },
+    });
+    c.add(MotionAnimation {
+        duration: 2.0,
+        motion: Move {
+            object_id: circle_b,
+            from: pos2(-50.0, -100.0).into(),
+            to: pos2(50.0, -100.0).into(),
+        },
+    });
+    b.play(c);
+
+    b.finish()
+}
+
+pub fn embedded_scenes() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let mut c = Concurrently::default();
+    c.add(EmbededScene {
+        scene: animations(),
+        transform: Transform::default()
+            .with_position(pos2(-100.0, 0.0))
+            .with_scale(0.5)
+            .into(),
+        speed: 1.0,
+        object_id: rand::random::<usize>(),
+        rooted: true,
+    });
+    c.add(EmbededScene {
+        scene: movement(),
+        transform: Transform::default()
+            .with_position(pos2(100.0, 0.0))
+            .with_scale(0.5)
+            .into(),
+        speed: 1.0,
+        object_id: rand::random::<usize>(),
+        rooted: true,
+    });
+
+    b.play(c);
+
+    b.finish()
 }
 
 // fn variables() -> Scene {

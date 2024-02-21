@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use egui::Color32;
 
 use crate::animation::{Animation, GenericAnimation, Time};
@@ -5,6 +7,9 @@ use crate::dynamics::{DynamicPos, DynamicTransform, DynamicValue};
 use crate::object::{Object, ObjectId, ObjectKind};
 
 use crate::object::Transform as ObjectTransform;
+use crate::object_tree::ObjectTree;
+use crate::scene::Scene;
+use crate::trigger::Trigger;
 use crate::utils::rotate_vec_around_vector;
 use crate::world::{Variable, World};
 
@@ -21,7 +26,7 @@ pub trait Motion {
 
 impl Motion for Box<dyn Motion> {
     fn animate(&self, world: &mut World, alpha: Alpha) {
-        self.animate(world, alpha);
+        self.as_ref().animate(world, alpha);
     }
 }
 
@@ -31,41 +36,98 @@ impl Motion for Wait {
     fn animate(&self, _world: &mut World, _alpha: Alpha) {}
 }
 
-pub struct Sequence(
-    /// All the durations must add up to 1.0.
-    pub Vec<GenericAnimation>,
-);
+#[derive(Default)]
+pub struct Sequence(pub Vec<GenericAnimation>);
+
+impl Sequence {
+    pub fn add<A: Animation + 'static>(&mut self, animation: A) {
+        self.0.push(Box::new(animation));
+    }
+}
 
 impl Motion for Sequence {
     fn animate(&self, world: &mut World, alpha: Alpha) {
-        // FIXME:
+        let total_duration: f32 = self.0.iter().map(|a| a.duration()).sum();
         let mut current_alpha = 0.0;
 
         for animation in &self.0 {
-            let duration = animation.duration();
+            let normalized_alpha = animation.duration() / total_duration;
 
-            let adusted_alpha = (alpha - current_alpha) / duration;
+            let adusted_alpha = (alpha - current_alpha) / normalized_alpha;
 
             if adusted_alpha < 0.0 {
                 return;
             }
 
-            animation.animate(world, adusted_alpha.min(1.0));
-            current_alpha += duration;
+            animation.animate(world, adusted_alpha);
+            current_alpha += normalized_alpha;
         }
     }
 }
 
+impl From<Vec<GenericAnimation>> for Sequence {
+    fn from(animations: Vec<GenericAnimation>) -> Self {
+        Self(animations)
+    }
+}
+
+#[derive(Default)]
 pub struct Concurrently(
     /// Order matters!
     pub Vec<GenericAnimation>,
 );
 
+impl Concurrently {
+    pub fn add<A: Animation + 'static>(&mut self, animation: A) {
+        self.0.push(Box::new(animation));
+    }
+}
+
 impl Motion for Concurrently {
     fn animate(&self, world: &mut World, alpha: Alpha) {
+        let total_duration: f32 = self.duration();
+
         for animation in &self.0 {
-            animation.animate(world, alpha);
+            animation.animate(
+                world,
+                ((total_duration * alpha) / animation.duration()).min(1.0),
+            );
         }
+    }
+}
+
+pub struct EmbededScene {
+    pub scene: Scene,
+    pub transform: DynamicTransform,
+    pub speed: f32,
+    pub object_id: ObjectId,
+    pub rooted: bool,
+}
+
+impl Motion for EmbededScene {
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        let transform = self.transform.get(world);
+
+        let objects = self
+            .scene
+            .render_at(self.scene.length() * alpha * self.speed);
+
+        let children = world.objects.merge(objects, self.object_id);
+
+        world.objects.add(
+            self.object_id,
+            Object {
+                transform,
+                object_kind: ObjectKind::Group(children),
+            },
+            self.rooted,
+        );
+    }
+}
+
+impl Animation for EmbededScene {
+    fn duration(&self) -> f32 {
+        self.scene.length() / self.speed
     }
 }
 
@@ -117,11 +179,51 @@ pub struct AddObject {
     pub rooted: bool,
 }
 
-impl Motion for AddObject {
-    fn animate(&self, world: &mut World, _alpha: Alpha) {
+impl Trigger for AddObject {
+    fn trigger(&self, world: &mut World) {
         world
             .objects
             .add(self.object_id, self.object.clone(), self.rooted);
+    }
+}
+
+pub struct Move {
+    pub from: DynamicPos,
+    pub to: DynamicPos,
+    pub object_id: usize,
+}
+
+impl Motion for Move {
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        let from = self.from.get(world);
+        let to = self.to.get(world);
+
+        let pos = from + (to - from) * alpha;
+
+        world
+            .objects
+            .get_mut(&self.object_id)
+            .unwrap()
+            .transform
+            .position = pos;
+    }
+}
+
+pub struct MoveTo {
+    to: DynamicPos,
+    object_id: usize,
+}
+
+impl Trigger for MoveTo {
+    fn trigger(&self, world: &mut World) {
+        let to = self.to.get(world);
+
+        world
+            .objects
+            .get_mut(&self.object_id)
+            .unwrap()
+            .transform
+            .position = to;
     }
 }
 

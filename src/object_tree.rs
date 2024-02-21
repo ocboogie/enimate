@@ -213,6 +213,30 @@ impl ObjectTree {
         self.objects.insert(id, object);
     }
 
+    pub fn merge(&mut self, mut other: ObjectTree, root_id: ObjectId) -> Vec<ObjectId> {
+        let mut rooted = Vec::new();
+        self.objects.extend(
+            other
+                .objects
+                .into_iter()
+                .map(|(id, object)| (if id == other.root { root_id } else { id }, object)),
+        );
+        self.parent_map
+            .extend(other.parent_map.into_iter().map(|(child, parent)| {
+                (
+                    child,
+                    if parent == other.root {
+                        rooted.push(child);
+                        root_id
+                    } else {
+                        parent
+                    },
+                )
+            }));
+
+        rooted
+    }
+
     fn flattened_transform(&self, id: ObjectId) -> Transform {
         let mut curr_id = id;
         let mut transforms = Vec::new();

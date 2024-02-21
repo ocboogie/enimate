@@ -10,39 +10,15 @@ pub type Variable = usize;
 pub struct World<'a> {
     pub objects: &'a mut ObjectTree,
     variables: HashMap<Variable, f32>,
-    length: Time,
-    // variable_trackers: &'a HashMap<Variable, Vec<MotionId>>,
-    // scene: &'a Scene,
 }
 
 impl<'a> World<'a> {
-    pub fn length(&self) -> Time {
-        self.length
-    }
-
-    pub fn new(
-        objects: &'a mut ObjectTree,
-        variables: HashMap<Variable, f32>,
-        length: Time,
-        // variable_trackers: &'a HashMap<Variable, Vec<MotionId>>,
-    ) -> Self {
-        Self {
-            objects,
-            variables,
-            length,
-        }
+    pub fn new(objects: &'a mut ObjectTree, variables: HashMap<Variable, f32>) -> Self {
+        Self { objects, variables }
     }
 
     pub fn update_variable(&mut self, variable: Variable, value: f32) {
         self.variables.insert(variable, value);
-
-        // if let Some(trackers) = self.variable_trackers.remove(&variable) {
-        //     for motion in &trackers {
-        //         self.play_at(*motion, value);
-        //     }
-        //
-        //     self.variable_trackers.insert(variable, trackers);
-        // }
     }
 
     pub fn update_variables(&mut self, variables: &HashMap<Variable, f32>) {

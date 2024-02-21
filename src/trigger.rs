@@ -1,0 +1,21 @@
+use crate::{
+    animation::{Animation, Time},
+    motion::{Alpha, Motion},
+    world::World,
+};
+
+pub trait Trigger {
+    fn trigger(&self, world: &mut World);
+}
+
+impl<T: Trigger> Motion for T {
+    fn animate(&self, world: &mut World, _time: Alpha) {
+        self.trigger(world);
+    }
+}
+
+impl<T: Trigger> Animation for T {
+    fn duration(&self) -> Time {
+        0.0
+    }
+}

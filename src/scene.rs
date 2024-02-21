@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     animation::{Animation, GenericAnimation, MotionAnimation, Time},
-    motion::{Motion, MotionId, Sequence, Wait},
+    building::{Builder, Component},
+    motion::{Alpha, Motion, MotionId, Sequence, Wait},
+    object::ObjectId,
     object_tree::ObjectTree,
     world::{Variable, World},
 };
@@ -21,24 +23,24 @@ impl Scene {
         self.0.duration()
     }
 
-    // pub fn sequence(animations: Vec<GenericAnimation>) -> Self {
-    //     let duration = animations.iter().map(|a| a.duration).sum();
-    // }
+    pub fn time_to_alpha(&self, time: Time) -> Alpha {
+        time / self.length()
+    }
 
-    pub fn render_at(&mut self, time: Time) -> ObjectTree {
+    pub fn render_at(&self, time: Time) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, HashMap::new(), self.length());
+        let mut world = World::new(&mut objects, HashMap::new());
 
-        self.0.animate(&mut world, time);
+        self.0.animate(&mut world, self.time_to_alpha(time));
 
         objects
     }
 
     pub fn render_with_input(&mut self, time: f32, input: HashMap<Variable, f32>) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, input, self.length());
+        let mut world = World::new(&mut objects, input);
 
-        self.0.animate(&mut world, time);
+        self.0.animate(&mut world, self.time_to_alpha(time));
 
         objects
     }

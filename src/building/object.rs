@@ -87,32 +87,32 @@ use super::{component::Handle, Builder, BuilderState, Positioner};
 //         // self.object_id
 //     }
 // }
-
-#[must_use]
-pub struct GroupBuilder<'a, B: Builder> {
-    pub builder: &'a mut B,
-    pub children: Vec<ObjectId>,
-}
-
-impl<'a, B: Builder> GroupBuilder<'a, B> {
-    pub fn new(builder: &'a mut B, _rooted: bool) -> Self {
-        Self {
-            builder,
-            children: Vec::new(),
-        }
-    }
-}
-
-impl<'a, B: Builder> Builder for GroupBuilder<'a, B> {
-    fn state(&mut self) -> &mut BuilderState {
-        self.builder.state()
-    }
-
-    fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
-        self.builder.play(motion, duration)
-    }
-
-    fn rooted(&mut self) -> bool {
-        false
-    }
-}
+//
+// #[must_use]
+// pub struct GroupBuilder<'a, B: Builder> {
+//     pub builder: &'a mut B,
+//     pub children: Vec<ObjectId>,
+// }
+//
+// impl<'a, B: Builder> GroupBuilder<'a, B> {
+//     pub fn new(builder: &'a mut B, _rooted: bool) -> Self {
+//         Self {
+//             builder,
+//             children: Vec::new(),
+//         }
+//     }
+// }
+//
+// impl<'a, B: Builder> Builder for GroupBuilder<'a, B> {
+//     fn state(&mut self) -> &mut BuilderState {
+//         self.builder.state()
+//     }
+//
+//     fn play(&mut self, motion: Box<dyn Motion>, duration: f32) -> MotionId {
+//         self.builder.play(motion, duration)
+//     }
+//
+//     fn rooted(&mut self) -> bool {
+//         false
+//     }
+// }

@@ -44,6 +44,12 @@ impl DynamicPos {
     }
 }
 
+impl From<Pos2> for DynamicPos {
+    fn from(pos: Pos2) -> Self {
+        DynamicPos::Literal(pos)
+    }
+}
+
 pub trait WorldTransform {
     fn get(&self, world: &World) -> Transform;
 }
@@ -62,6 +68,17 @@ impl DynamicTransform {
             scale: self.scale.get(world),
             rotation: self.rotation.get(world),
             anchor: self.anchor.get(world),
+        }
+    }
+}
+
+impl From<Transform> for DynamicTransform {
+    fn from(transform: Transform) -> Self {
+        DynamicTransform {
+            position: DynamicPos::Literal(transform.position),
+            scale: DynamicValue::Literal(transform.scale),
+            rotation: DynamicValue::Literal(transform.rotation),
+            anchor: DynamicPos::Literal(transform.anchor),
         }
     }
 }
