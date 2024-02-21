@@ -1,6 +1,6 @@
 use crate::{
     mesh::{Mesh, Vertex},
-    object::{Material, Object, ObjectId, ObjectKind, Transform},
+    object::{Object, ObjectId, ObjectKind, Transform},
     utils::box2d_to_rect,
 };
 use egui::{pos2, Color32, Rect};
@@ -10,7 +10,6 @@ use lyon::{
         BuffersBuilder, FillOptions, FillTessellator, FillVertex, StrokeOptions, StrokeTessellator,
         StrokeVertex, VertexBuffers,
     },
-    math::Box2D,
     path::Path,
 };
 use std::{

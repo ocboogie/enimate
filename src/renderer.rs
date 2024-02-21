@@ -1,5 +1,4 @@
 use crate::mesh::Vertex;
-use crate::object::{Material, ObjectId};
 use crate::object_tree::{ObjectTree, RenderObject, RenderObjectKind};
 use eframe::wgpu::ColorTargetState;
 use eframe::{

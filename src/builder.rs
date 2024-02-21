@@ -1,22 +1,33 @@
 use crate::{
     animation::Animation,
-    mesh::{Mesh, Vertex},
-    motion::{AddObject, Concurrently, Motion, MotionId, Sequence, Wait},
-    object::{Material, Object, ObjectId},
+    component::Component,
+    motion::{AddObject, Motion},
+    object::{Object, ObjectId},
+    object_tree::ObjectTree,
+    scene::Scene,
+    world::World,
 };
-use egui::pos2;
-use lyon::{
-    geom::Box2D,
-    lyon_tessellation::{
-        BuffersBuilder, FillGeometryBuilder, FillVertex, StrokeGeometryBuilder, StrokeOptions,
-        StrokeTessellator, StrokeVertex,
-    },
-    math::point,
-    path::{Path, Winding},
-    tessellation::{FillOptions, FillTessellator, VertexBuffers},
-};
+use std::collections::HashMap;
 
-use super::{component::Component, BuilderState};
+pub struct BuilderState {
+    pub scene: Scene,
+    pub objects: ObjectTree,
+}
+
+impl BuilderState {
+    pub fn new() -> Self {
+        Self {
+            scene: Scene::null(),
+            objects: ObjectTree::new(),
+        }
+    }
+
+    pub fn emulate_motion(&mut self, motion: &dyn Motion) {
+        // Run the motion, so the state of objects is consistent with the end of the motion.
+        let world = &mut World::new(&mut self.objects, HashMap::new());
+        motion.animate(world, 1.0);
+    }
+}
 
 pub trait Builder: Sized {
     fn state(&mut self) -> &mut BuilderState;

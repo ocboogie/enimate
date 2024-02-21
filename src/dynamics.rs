@@ -50,6 +50,12 @@ impl From<Pos2> for DynamicPos {
     }
 }
 
+impl<T: WorldPos + 'static> From<T> for DynamicPos {
+    fn from(pos: T) -> Self {
+        DynamicPos::Dynamic(Box::new(pos))
+    }
+}
+
 pub trait WorldTransform {
     fn get(&self, world: &World) -> Transform;
 }

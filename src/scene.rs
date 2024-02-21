@@ -1,13 +1,12 @@
-use std::collections::HashMap;
-
 use crate::{
-    animation::{Animation, GenericAnimation, MotionAnimation, Time},
-    building::{Builder, Component},
-    motion::{Alpha, Motion, MotionId, Sequence, Wait},
-    object::ObjectId,
+    animation::{Animation, MotionAnimation, Time},
+    builder::{Builder, BuilderState},
+    motion::{Alpha, Motion},
     object_tree::ObjectTree,
+    temporal::{Sequence, Wait},
     world::{Variable, World},
 };
+use std::collections::HashMap;
 
 pub struct Scene(pub Sequence);
 
@@ -43,5 +42,32 @@ impl Scene {
         self.0.animate(&mut world, self.time_to_alpha(time));
 
         objects
+    }
+}
+
+pub struct SceneBuilder {
+    state: BuilderState,
+}
+
+impl SceneBuilder {
+    pub fn new() -> Self {
+        Self {
+            state: BuilderState::new(),
+        }
+    }
+
+    pub fn finish(self) -> Scene {
+        self.state.scene
+    }
+}
+
+impl Builder for SceneBuilder {
+    fn state(&mut self) -> &mut BuilderState {
+        &mut self.state
+    }
+
+    fn play<A: Animation + 'static>(&mut self, animation: A) {
+        self.state.emulate_motion(&animation);
+        (self.state.scene.0).0.push(Box::new(animation));
     }
 }

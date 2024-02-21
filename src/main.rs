@@ -1,42 +1,29 @@
-use std::collections::HashMap;
-
 use animation::MotionAnimation;
-use building::{Builder, SceneBuilder};
-// use building::{Alignment, Builder, Handle, SceneBuilder};
-use dynamics::{DynamicTransform, DynamicValue};
-// use component::Component;
-use egui::{pos2, Color32, Pos2, Stroke, Vec2};
-use lyon::{
-    math::point,
-    path::{traits::PathBuilder, Path, Winding},
-};
-
-use motion::{
-    AddObject, Concurrently, EmbededScene, FadeIn, Motion, MotionId, Move, Sequence, Wait,
-};
-// use building::{Builder, SceneBuilder};
-// use motion_ui::fixme;
-use object::{
-    FillMaterial, Material, Model, Object, ObjectId, ObjectKind, StrokeMaterial, Transform,
-};
-use object_tree::ObjectTree;
+use builder::Builder;
+use egui::{pos2, Color32, Pos2, Stroke};
+use lyon::{math::point, path::Path};
+use motion::{AddObject, EmbededScene, FadeIn, Move};
+use object::{FillMaterial, Material, Model, Object, ObjectKind, StrokeMaterial, Transform};
 use renderer::Renderer;
-use scene::Scene;
+use scene::{Scene, SceneBuilder};
 use shapes::Circle;
-use world::World;
+use spatial::Alignment;
+use std::collections::HashMap;
+use temporal::{Concurrently, Sequence, Wait};
 
-mod building;
-// mod component;
+mod animation;
+mod builder;
+mod component;
 mod dynamics;
 mod mesh;
 mod motion;
-// mod motion_ui;
-mod animation;
 mod object;
 mod object_tree;
 mod renderer;
 mod scene;
 mod shapes;
+mod spatial;
+mod temporal;
 mod trigger;
 mod utils;
 mod world;
@@ -195,9 +182,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // ("Building", building()),
                     ("Animations", animations()),
                     ("Movement", movement()),
-                    // ("Alignment", alignment()),
                     // ("Variables", variables()),
                     ("Scenes", embedded_scenes()),
+                    ("Dynamic Alignment", dynamic_alignment()),
                 ],
             ))
         }),
@@ -241,38 +228,6 @@ fn stroke() -> Scene {
 
     Scene(seq)
 }
-
-// fn animations() -> Scene {
-//     let mut builder = Path::builder();
-//     builder.begin(point(0.0, 0.0));
-//     builder.line_to(point(1.0, 2.0));
-//     builder.line_to(point(2.0, 0.0));
-//     builder.line_to(point(1.0, 1.0));
-//     builder.close();
-//     let path = builder.build();
-//
-//     let mut builder = SceneBuilder::new();
-//
-//     let object = builder.add_new_object(Object {
-//         object_kind: ObjectKind::Model(Model {
-//             path,
-//             material: Material {
-//                 stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
-//                 fill: Some(FillMaterial::new(Color32::WHITE)),
-//             },
-//         }),
-//         transform: Transform::default().with_scale(50.0),
-//     });
-//
-//     builder.play(
-//         (MotionAnimation {
-//             duration: 1.0,
-//             motion: FadeIn { object_id: object },
-//         }),
-//     );
-//
-//     builder.finish()
-// }
 
 fn animations() -> Scene {
     let mut b = SceneBuilder::new();
@@ -378,183 +333,41 @@ pub fn embedded_scenes() -> Scene {
     b.finish()
 }
 
-// fn variables() -> Scene {
-//     let mut motions: HashMap<MotionId, Box<dyn Motion>> = HashMap::new();
-//     let mut variables_subscriptions: HashMap<usize, Vec<MotionId>> = HashMap::new();
-//
-//     let mut builder = Path::builder();
-//     builder.add_circle(point(0.0, 0.0), 10.0, Winding::Positive);
-//     let path = builder.build();
-//
-//     let add: MotionId = rand::random::<usize>();
-//     let circle_id: ObjectId = rand::random::<usize>();
-//     motions.insert(
-//         add,
-//         Box::new(AddObject {
-//             object: Object {
-//                 object_kind: ObjectKind::Model(Model {
-//                     path,
-//                     material: FillMaterial::new(Color32::RED).into(),
-//                 }),
-//                 transform: Transform::default().with_scale(1.0),
-//             },
-//             rooted: true,
-//             object_id: circle_id,
-//         }),
-//     );
-//
-//     let var = 3;
-//
-//     let mv: MotionId = rand::random::<usize>();
-//     motions.insert(mv, Box::new(SetVariable { var }));
-//
-//     let root: MotionId = rand::random::<usize>();
-//     motions.insert(
-//         root,
-//         Box::new(Parallel {
-//             motions: vec![add, mv],
-//         }),
-//     );
-//
-//     let tracker: MotionId = rand::random::<usize>();
-//     motions.insert(
-//         tracker,
-//         Box::new(Rotate {
-//             around: pos2(0.0, 0.0).into(),
-//             object_id: circle_id,
-//             from: 0.0.into(),
-//             to: 360.0.into(),
-//         }),
-//     );
-//
-//     variables_subscriptions.insert(var, vec![tracker]);
-//
-//     Scene::new(motions, root, variables_subscriptions, 2.0)
-// }
+fn dynamic_alignment() -> Scene {
+    let mut b = SceneBuilder::new();
 
-// fn mouse_input() -> Scene {
-//     let mut builder = Path::builder();
-//     builder.add_circle(point(0.0, 0.0), 10.0, Winding::Positive);
-//     let path = builder.build();
-//
-//     motions.insert(
-//         add_object,
-//         Box::new(AddObject {
-//             object: Object {
-//                 object_kind: ObjectKind::Model(Model {
-//                     path,
-//                     material: FillMaterial::new(Color32::RED).into(),
-//                 }),
-//                 transform: Transform::default().with_scale(1.0),
-//             },
-//             rooted: true,
-//             object_id: circle_id,
-//         }),
-//     );
-//
-//     let update_pos: MotionId = rand::random::<usize>();
-//     let mut transform: DynamicTransform = Transform::default().with_position(pos2(0.0, 0.0)).into();
-//
-//     transform.position.x = DynamicValue::Variable(0);
-//     transform.position.y = DynamicValue::Variable(1);
-//
-//     motions.insert(
-//         update_pos,
-//         Box::new(SetTransform {
-//             object_id: circle_id,
-//             transform,
-//         }),
-//     );
-//
-//     let root = rand::random::<usize>();
-//
-//     motions.insert(
-//         root,
-//         Box::new(Concurrently {
-//             motions: vec![add_object, update_pos],
-//         }),
-//     );
-//
-//     // variables_subscriptions.insert(0, vec![update_pos]);
-//     // variables_subscriptions.insert(1, vec![update_pos]);
-//
-//     Scene::new(motions, root, 2.0)
-// }
+    let right_circle = b.add(Circle {
+        radius: 25.0,
+        center: pos2(100.0, 100.0),
+        material: FillMaterial::new(Color32::RED).into(),
+    });
+    let left_circle = b.add(Circle {
+        radius: 25.0,
+        center: pos2(-100.0, 100.0),
+        material: FillMaterial::new(Color32::BLUE).into(),
+    });
 
-// pub fn building() -> Scene {
-//     let mut builder = SceneBuilder::new(5.0);
-//
-//     builder.add(Circle {
-//         radius: 50.0,
-//         center: pos2(0.0, 0.0),
-//         material: FillMaterial::new(Color32::RED).into(),
-//     });
-//
-//     builder.finish()
-// }
-//
-// fn animations() -> Scene {
-//     let mut b = SceneBuilder::new(5.0);
-//
-//     let mut motions: Vec<(Box<dyn Motion>, f32)> = Vec::new();
-//
-//     for i in 0..9 {
-//         let circle = b.add(Circle {
-//             radius: 50.0,
-//             center: pos2(
-//                 (i % 3) as f32 * 100.0 - 100.0,
-//                 (i / 3) as f32 * 100.0 - 100.0,
-//             ),
-//             material: FillMaterial::new(Color32::RED).into(),
-//         });
-//
-//         motions.push(b.sequence(vec![
-//             (Box::new(Wait), 0.1 * i as f32),
-//             (
-//                 Box::new(FadeIn {
-//                     object_id: circle.id(),
-//                 }),
-//                 0.3,
-//             ),
-//         ]));
-//     }
-//
-//     b.play_concurrently(motions);
-//
-//     b.finish()
-//
-//     // b.parallel(|p| {
-//     //     for i in 0..9 {
-//     //         p.sequence(|s| {
-//     //             s.delay(0.1 * i as f32);
-//     //             s.rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
-//     //                 .with_position(pos2(
-//     //                     (i % 3) as f32 * 100.0 - 100.0,
-//     //                     (i / 3) as f32 * 100.0 - 100.0,
-//     //                 ))
-//     //                 .animate(0.3, |a| a.fade_in());
-//     //         });
-//     //     }
-//     // });
-//     //
-//     // scene_builder.finish()
-// }
-//
-// fn alignment() -> Scene {
-//     let mut b = SceneBuilder::new(5.0);
-//
-//     // let moving_rect = b
-//     //     .rect(50.0, 50.0, FillMaterial::new(Color32::RED).into())
-//     //     // .with_position(pos2(25.0, 25.0))
-//     //     .with_position(pos2(0.0, 50.0))
-//     //     .animate(0.3, |a| a.translate(pos2(0.0, -50.0)));
-//     //
-//     // b.wait(0.3);
-//     //
-//     // let moving_circle = b
-//     //     .circle(25.0, FillMaterial::new(Color32::BLUE).into())
-//     //     .animate(0.3, |a| a.move_to(Alignment::target(moving_rect).left()));
-//     // .with_position(pos2(-50.0, 50.0))
-//
-//     b.finish()
-// }
+    let mut c = Concurrently::default();
+
+    c.add(MotionAnimation {
+        duration: 1.0,
+        motion: Move {
+            object_id: right_circle,
+            from: Alignment::new(right_circle).center().into(),
+            to: pos2(100.0, -100.0).into(),
+        },
+    });
+
+    c.add(MotionAnimation {
+        duration: 1.0,
+        motion: Move {
+            object_id: left_circle,
+            from: Alignment::new(left_circle).center().into(),
+            to: Alignment::new(right_circle).left().into(),
+        },
+    });
+
+    b.play(c);
+
+    b.finish()
+}

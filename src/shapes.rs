@@ -1,12 +1,13 @@
-use egui::Pos2;
+use egui::{pos2, Pos2};
 use lyon::{
     math::point,
     path::{Path, Winding},
 };
 
 use crate::{
-    building::{Builder, Component},
-    object::{Material, Object, ObjectId},
+    builder::Builder,
+    component::Component,
+    object::{Material, Object, ObjectId, Transform},
 };
 
 pub struct Circle {
@@ -20,13 +21,10 @@ impl Component for Circle {
 
     fn add<B: Builder>(self, builder: &mut B) -> Self::Handle {
         let mut path_builder = Path::builder();
-        path_builder.add_circle(
-            point(self.center.x, self.center.y),
-            self.radius,
-            Winding::Positive,
-        );
+        path_builder.add_circle(point(0.0, 0.0), self.radius, Winding::Positive);
 
-        let object = Object::new_model(path_builder.build(), self.material);
+        let object = Object::new_model(path_builder.build(), self.material)
+            .with_transform(Transform::default().with_position(self.center));
 
         builder.add_new_object(object)
     }

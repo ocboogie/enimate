@@ -1,9 +1,5 @@
 use egui::{pos2, Color32, Pos2, Rect};
-use lyon::{
-    algorithms::aabb::bounding_box,
-    math::{point, Box2D},
-    path::Path,
-};
+use lyon::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct FillMaterial {

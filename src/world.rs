@@ -1,9 +1,5 @@
-use std::collections::HashMap;
-
-use crate::animation::Time;
-use crate::motion::{Motion, MotionId};
 use crate::object_tree::ObjectTree;
-use crate::scene::Scene;
+use std::collections::HashMap;
 
 pub type Variable = usize;
 

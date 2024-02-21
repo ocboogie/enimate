@@ -1,5 +1,5 @@
 use crate::{
-    motion::{Alpha, Concurrently, Motion, Sequence},
+    motion::{Alpha, Motion},
     world::World,
 };
 
@@ -37,21 +37,5 @@ impl Motion for GenericAnimation {
 impl Animation for GenericAnimation {
     fn duration(&self) -> Time {
         self.as_ref().duration()
-    }
-}
-
-impl Animation for Sequence {
-    fn duration(&self) -> Time {
-        self.0.iter().map(|a| a.duration()).sum()
-    }
-}
-
-impl Animation for Concurrently {
-    fn duration(&self) -> Time {
-        self.0
-            .iter()
-            .map(|a| a.duration())
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap()
     }
 }

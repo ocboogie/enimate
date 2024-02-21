@@ -1,7 +1,18 @@
-use crate::building::Builder;
+use crate::builder::Builder;
+use crate::object::ObjectId;
+
+pub trait Handle {
+    fn id(&self) -> ObjectId;
+}
+
+impl Handle for ObjectId {
+    fn id(&self) -> ObjectId {
+        *self
+    }
+}
 
 pub trait Component {
-    type Handle;
+    type Handle: Handle;
 
-    fn build(&self, builder: &mut impl Builder) -> Self::Handle;
+    fn add<B: Builder>(self, builder: &mut B) -> Self::Handle;
 }
