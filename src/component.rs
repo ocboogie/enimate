@@ -14,5 +14,5 @@ impl Handle for ObjectId {
 pub trait Component {
     type Handle: Handle;
 
-    fn add<B: Builder>(self, builder: &mut B) -> Self::Handle;
+    fn build<B: Builder>(self, builder: &mut B) -> Self::Handle;
 }

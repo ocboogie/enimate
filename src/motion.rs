@@ -1,4 +1,4 @@
-use crate::animation::Animation;
+use crate::animation::{Animation, MotionAnimation};
 use crate::dynamics::{DynamicPos, DynamicTransform};
 use crate::object::{Object, ObjectId, ObjectKind};
 use crate::scene::Scene;
@@ -13,6 +13,22 @@ pub type Alpha = f32;
 /// between 0 and 1.
 pub trait Motion {
     fn animate(&self, world: &mut World, alpha: Alpha);
+
+    fn with_duration(self, duration: f32) -> impl Animation
+    where
+        Self: Sized,
+    {
+        MotionAnimation {
+            motion: self,
+            duration,
+        }
+    }
+}
+
+impl Motion for fn(&mut World, Alpha) {
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        self(world, alpha);
+    }
 }
 
 impl Motion for Box<dyn Motion> {

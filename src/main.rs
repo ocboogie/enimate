@@ -1,12 +1,16 @@
 use animation::MotionAnimation;
 use builder::Builder;
+use component::{Component, Handle};
 use egui::{pos2, Color32, Pos2, Stroke};
+use group::Group;
 use lyon::{math::point, path::Path};
-use motion::{AddObject, EmbededScene, FadeIn, Move};
-use object::{FillMaterial, Material, Model, Object, ObjectKind, StrokeMaterial, Transform};
+use motion::{AddObject, EmbededScene, FadeIn, Motion, Move};
+use object::{
+    FillMaterial, Material, Model, Object, ObjectId, ObjectKind, StrokeMaterial, Transform,
+};
 use renderer::Renderer;
 use scene::{Scene, SceneBuilder};
-use shapes::Circle;
+use shapes::{Circle, Line};
 use spatial::Alignment;
 use std::collections::HashMap;
 use temporal::{Concurrently, Sequence, Wait};
@@ -15,6 +19,7 @@ mod animation;
 mod builder;
 mod component;
 mod dynamics;
+mod group;
 mod mesh;
 mod motion;
 mod object;
@@ -185,6 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // ("Variables", variables()),
                     ("Scenes", embedded_scenes()),
                     ("Dynamic Alignment", dynamic_alignment()),
+                    ("Grid", grid()),
                 ],
             ))
         }),
@@ -370,4 +376,85 @@ fn dynamic_alignment() -> Scene {
     b.play(c);
 
     b.finish()
+}
+
+fn grid() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let grid = b.add(Grid {
+        rows: 10,
+        cols: 10,
+        width: 100.0,
+        height: 100.0,
+        material: StrokeMaterial::new(Color32::BLUE, 5.0).into(),
+    });
+
+    b.finish()
+}
+
+struct Grid {
+    rows: usize,
+    cols: usize,
+    width: f32,
+    height: f32,
+    material: Material,
+}
+
+struct GridHandle {
+    grid: ObjectId,
+}
+
+impl Handle for GridHandle {
+    fn id(&self) -> ObjectId {
+        self.grid
+    }
+}
+
+impl Component for Grid {
+    type Handle = ObjectId;
+
+    fn build<B: Builder>(self, builder: &mut B) -> ObjectId {
+        let mut c = Concurrently::default();
+
+        let grid = builder.group(|group| {
+            let horizontal_lines = group.group(|group| {
+                for i in 0..self.rows {
+                    let x = -self.width / 2.0;
+                    let y = (i as f32 / self.rows as f32) * self.height;
+
+                    let line = group.add(Line {
+                        start: pos2(x, y),
+                        end: pos2(x, y),
+                        material: self.material.clone(),
+                    });
+
+                    c.add(
+                        line.animate(pos2(x + self.width, y), pos2(x, y))
+                            .with_duration(1.0),
+                    );
+                }
+            });
+            let vertical_lines = group.group(|group| {
+                for i in 0..self.cols {
+                    let x = (i as f32 / self.cols as f32) * self.width;
+                    let y = -self.height / 2.0;
+
+                    let line = group.add(Line {
+                        start: pos2(x, y),
+                        end: pos2(x, y),
+                        material: self.material.clone(),
+                    });
+
+                    c.add(
+                        line.animate(pos2(x, y), pos2(x, y + self.height))
+                            .with_duration(1.0),
+                    );
+                }
+            });
+        });
+
+        builder.play(c);
+
+        grid
+    }
 }
