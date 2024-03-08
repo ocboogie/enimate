@@ -1,6 +1,7 @@
 use animation::{Animation, MotionAnimation};
 use builder::Builder;
 use component::{Component, Handle};
+use dynamics::DynamicType;
 use egui::{pos2, Color32, Pos2, Stroke};
 use lyon::{math::point, path::Path};
 use motion::{AddObject, EmbededScene, FadeIn, Motion, Move};
@@ -291,16 +292,16 @@ fn movement() -> Scene {
         duration: 1.0,
         motion: Move {
             object_id: circle_a,
-            from: pos2(-50.0, 100.0).into(),
-            to: pos2(50.0, 100.0).into(),
+            from: pos2(-50.0, 100.0).d(),
+            to: pos2(50.0, 100.0).d(),
         },
     });
     c.add(MotionAnimation {
         duration: 2.0,
         motion: Move {
             object_id: circle_b,
-            from: pos2(-50.0, -100.0).into(),
-            to: pos2(50.0, -100.0).into(),
+            from: pos2(-50.0, -100.0).d(),
+            to: pos2(50.0, -100.0).d(),
         },
     });
     b.play(c);
@@ -354,23 +355,23 @@ fn dynamic_alignment() -> Scene {
 
     let mut c = Concurrently::default();
 
-    c.add(MotionAnimation {
-        duration: 1.0,
-        motion: Move {
+    c.add(
+        Move {
             object_id: right_circle,
-            from: Alignment::new(right_circle).center().into(),
-            to: pos2(100.0, -100.0).into(),
-        },
-    });
+            from: Alignment::new(right_circle).center().d(),
+            to: pos2(100.0, -100.0).d(),
+        }
+        .with_duration(1.0),
+    );
 
-    c.add(MotionAnimation {
-        duration: 1.0,
-        motion: Move {
+    c.add(
+        Move {
             object_id: left_circle,
-            from: Alignment::new(left_circle).center().into(),
-            to: Alignment::new(right_circle).left().into(),
-        },
-    });
+            from: Alignment::new(left_circle).center().d(),
+            to: Alignment::new(right_circle).left().d(),
+        }
+        .with_duration(1.0),
+    );
 
     b.play(c);
 
@@ -389,9 +390,9 @@ fn grid() -> Scene {
     let grid = b.add(Grid {
         rows: 10,
         cols: 10,
-        width: 100.0,
-        height: 100.0,
-        material: StrokeMaterial::new(Color32::BLUE, 5.0).into(),
+        width: 300.0,
+        height: 300.0,
+        material: StrokeMaterial::new(Color32::BLUE, 1.0).into(),
     });
 
     b.finish()

@@ -1,4 +1,4 @@
-use crate::{component::Handle, dynamics::WorldPos, object::ObjectId, world::World};
+use crate::{component::Handle, dynamics::DynamicType, object::ObjectId, world::World};
 use egui::Pos2;
 
 pub enum HorizontalAlignment {
@@ -14,18 +14,18 @@ pub enum VerticalAlignment {
 }
 
 pub struct Alignment {
-    pub target: ObjectId,
-    pub horizontal: HorizontalAlignment,
-    pub vertical: VerticalAlignment,
+    target: ObjectId,
+    horizontal: HorizontalAlignment,
+    vertical: VerticalAlignment,
 }
 
 impl Alignment {
-    pub fn new(target: ObjectId) -> Self {
-        Self {
+    pub fn new(target: ObjectId) -> Box<Self> {
+        Box::new(Self {
             target,
             horizontal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
-        }
+        })
     }
 
     pub fn left(mut self) -> Self {
@@ -54,7 +54,7 @@ impl Alignment {
     }
 }
 
-impl WorldPos for Alignment {
+impl DynamicType<Pos2> for Alignment {
     fn get(&self, world: &World) -> Pos2 {
         let bb = world.objects.local_bounding_box(self.target);
 

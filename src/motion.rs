@@ -1,10 +1,10 @@
 use crate::animation::{Animation, MotionAnimation};
-use crate::dynamics::{DynamicPos, DynamicTransform};
+use crate::dynamics::{Dynamic, DynamicTransform, DynamicType};
 use crate::object::{Object, ObjectId, ObjectKind};
 use crate::scene::Scene;
 use crate::trigger::Trigger;
 use crate::world::World;
-use egui::Color32;
+use egui::{Color32, Pos2};
 
 pub type Alpha = f32;
 
@@ -87,8 +87,8 @@ impl Trigger for AddObject {
 }
 
 pub struct Move {
-    pub from: DynamicPos,
-    pub to: DynamicPos,
+    pub from: Dynamic<Pos2>,
+    pub to: Dynamic<Pos2>,
     pub object_id: usize,
 }
 
@@ -109,7 +109,7 @@ impl Motion for Move {
 }
 
 pub struct MoveTo {
-    to: DynamicPos,
+    to: Dynamic<Pos2>,
     object_id: usize,
 }
 
