@@ -1,8 +1,7 @@
-use animation::MotionAnimation;
+use animation::{Animation, MotionAnimation};
 use builder::Builder;
 use component::{Component, Handle};
 use egui::{pos2, Color32, Pos2, Stroke};
-use group::Group;
 use lyon::{math::point, path::Path};
 use motion::{AddObject, EmbededScene, FadeIn, Motion, Move};
 use object::{
@@ -139,7 +138,7 @@ impl eframe::App for App {
 
                     self.renderer.paint_at(ui, rect, objects);
 
-                    if true {
+                    if false {
                         let bb_canvas = ui.painter_at(rect);
                         for (_id, bb) in boxes {
                             bb_canvas.rect_stroke(
@@ -213,13 +212,13 @@ fn stroke() -> Scene {
             duration: 0.0,
             motion: AddObject {
                 object: Object {
-                    object_kind: ObjectKind::Model(Model {
+                    object_kind: ObjectKind::Model(Model::new(
                         path,
-                        material: Material {
+                        Material {
                             stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
                             fill: Some(FillMaterial::new(Color32::WHITE)),
                         },
-                    }),
+                    )),
                     transform: Transform::default().with_scale(50.0),
                 },
                 object_id: rand::random::<usize>(),
@@ -381,6 +380,12 @@ fn dynamic_alignment() -> Scene {
 fn grid() -> Scene {
     let mut b = SceneBuilder::new();
 
+    let line = b.add(Line {
+        start: pos2(0.0, 0.0),
+        end: pos2(0.0, 0.0),
+        material: StrokeMaterial::new(Color32::BLUE, 5.0).into(),
+    });
+
     let grid = b.add(Grid {
         rows: 10,
         cols: 10,
@@ -418,9 +423,9 @@ impl Component for Grid {
 
         let grid = builder.group(|group| {
             let horizontal_lines = group.group(|group| {
-                for i in 0..self.rows {
+                for i in 0..=self.rows {
                     let x = -self.width / 2.0;
-                    let y = (i as f32 / self.rows as f32) * self.height;
+                    let y = (i as f32 / self.rows as f32) * self.height - self.height / 2.0;
 
                     let line = group.add(Line {
                         start: pos2(x, y),
@@ -429,14 +434,17 @@ impl Component for Grid {
                     });
 
                     c.add(
-                        line.animate(pos2(x + self.width, y), pos2(x, y))
-                            .with_duration(1.0),
+                        Wait.with_duration(0.1 * i as f32).then(
+                            line.animate(pos2(x + self.width, y), pos2(x, y))
+                                .with_duration(1.0),
+                        ),
                     );
                 }
             });
+
             let vertical_lines = group.group(|group| {
-                for i in 0..self.cols {
-                    let x = (i as f32 / self.cols as f32) * self.width;
+                for i in 0..=self.cols {
+                    let x = (i as f32 / self.cols as f32) * self.width - self.width / 2.0;
                     let y = -self.height / 2.0;
 
                     let line = group.add(Line {
@@ -446,8 +454,10 @@ impl Component for Grid {
                     });
 
                     c.add(
-                        line.animate(pos2(x, y), pos2(x, y + self.height))
-                            .with_duration(1.0),
+                        Wait.with_duration(0.1 * i as f32).then(
+                            line.animate(pos2(x, y), pos2(x, y + self.height))
+                                .with_duration(1.0),
+                        ),
                     );
                 }
             });

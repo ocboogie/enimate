@@ -11,7 +11,7 @@ pub type Alpha = f32;
 /// A motion is the most basic momvement primitive. It is a function that takes a world
 /// and updates the world, adding objects, mutating them, or animating them. The time is a value
 /// between 0 and 1.
-pub trait Motion {
+pub trait Motion: 'static {
     fn animate(&self, world: &mut World, alpha: Alpha);
 
     fn with_duration(self, duration: f32) -> impl Animation

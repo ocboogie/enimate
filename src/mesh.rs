@@ -1,8 +1,6 @@
 use eframe::egui_wgpu::wgpu;
 use egui::{pos2, Pos2, Rect};
 
-
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {

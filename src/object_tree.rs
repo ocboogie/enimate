@@ -50,6 +50,7 @@ pub struct RenderObject {
     pub color: Color32,
     pub transform: Transform,
     pub kind: RenderObjectKind,
+    pub mesh_revision: usize,
 }
 
 impl ObjectTree {
@@ -138,27 +139,34 @@ impl ObjectTree {
                 }
 
                 if let Some(fill) = &model.material.fill {
-                    objects.push(RenderObject {
-                        id,
-                        mesh: Self::tessellate_fill(fill_tessellator, &model.path),
-                        color: fill.color,
-                        transform,
-                        kind: RenderObjectKind::Fill,
-                    });
+                    let mesh = Self::tessellate_fill(fill_tessellator, &model.path());
+
+                    if !mesh.vertices.is_empty() {
+                        objects.push(RenderObject {
+                            id,
+                            mesh,
+                            color: fill.color,
+                            transform,
+                            kind: RenderObjectKind::Fill,
+                            mesh_revision: model.revision(),
+                        });
+                    }
                 }
 
                 if let Some(stroke) = &model.material.stroke {
-                    objects.push(RenderObject {
-                        id,
-                        mesh: Self::tessellate_stroke(
-                            stroke_tessellator,
-                            stroke.width,
-                            &model.path,
-                        ),
-                        color: stroke.color,
-                        transform,
-                        kind: RenderObjectKind::Stroke,
-                    });
+                    let mesh =
+                        Self::tessellate_stroke(stroke_tessellator, stroke.width, &model.path());
+
+                    if !mesh.vertices.is_empty() {
+                        objects.push(RenderObject {
+                            id,
+                            mesh,
+                            color: stroke.color,
+                            transform,
+                            kind: RenderObjectKind::Stroke,
+                            mesh_revision: model.revision(),
+                        });
+                    }
                 }
             }
             ObjectKind::Group(group) => {
@@ -187,6 +195,7 @@ impl ObjectTree {
             &mut stroke_tessellator,
             &mut objects,
         );
+
         objects
     }
 
@@ -212,7 +221,7 @@ impl ObjectTree {
         self.objects.insert(id, object);
     }
 
-    pub fn merge(&mut self, mut other: ObjectTree, root_id: ObjectId) -> Vec<ObjectId> {
+    pub fn merge(&mut self, other: ObjectTree, root_id: ObjectId) -> Vec<ObjectId> {
         let mut rooted = Vec::new();
         self.objects.extend(
             other
@@ -260,7 +269,7 @@ impl ObjectTree {
 
         match &object.object_kind {
             ObjectKind::Model(model) => {
-                transform.map_aabb(box2d_to_rect(bounding_box(&model.path)))
+                transform.map_aabb(box2d_to_rect(bounding_box(model.path())))
             }
             ObjectKind::Group(group) => {
                 let mut bounding_box = Rect::NOTHING;
@@ -305,7 +314,7 @@ impl ObjectTree {
 
         let bb = match &object.object_kind {
             ObjectKind::Model(model) => {
-                transform.map_aabb(box2d_to_rect(bounding_box(&model.path)))
+                transform.map_aabb(box2d_to_rect(bounding_box(model.path())))
             }
             ObjectKind::Group(group) => {
                 let mut bounding_box = Rect::NOTHING;

@@ -4,7 +4,7 @@ use crate::{
     world::World,
 };
 
-pub trait Trigger {
+pub trait Trigger: 'static {
     fn trigger(&self, world: &mut World);
 }
 

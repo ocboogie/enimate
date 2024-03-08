@@ -1,12 +1,20 @@
 use crate::{
     motion::{Alpha, Motion},
+    temporal::Sequence,
     world::World,
 };
 
 pub type Time = f32;
 
-pub trait Animation: Motion {
+pub trait Animation: Motion + 'static {
     fn duration(&self) -> Time;
+
+    fn then<A: Animation>(self, other: A) -> Sequence
+    where
+        Self: Sized,
+    {
+        Sequence(vec![Box::new(self), Box::new(other)])
+    }
 }
 
 pub struct MotionAnimation<M: Motion> {

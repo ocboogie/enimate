@@ -9,6 +9,7 @@ use crate::{
     component::{Component, Handle},
     motion::Motion,
     object::{Material, Object, ObjectId, ObjectKind, Transform},
+    trigger::Trigger,
     world::World,
 };
 
@@ -72,6 +73,36 @@ impl Handle for LineHandle {
 }
 
 impl LineHandle {
+    pub fn change(&self, start: Pos2, end: Pos2) -> impl Trigger {
+        struct LineChange {
+            object_id: ObjectId,
+            start: Pos2,
+            end: Pos2,
+        }
+
+        impl Trigger for LineChange {
+            fn trigger(&self, world: &mut World) {
+                match &mut world.objects.get_mut(&self.object_id).unwrap().object_kind {
+                    ObjectKind::Model(ref mut model) => {
+                        let mut path_builder = Path::builder();
+                        path_builder.begin(point(self.start.x, self.start.y));
+                        path_builder.line_to(point(self.end.x, self.end.y));
+                        path_builder.end(false);
+
+                        model.update_path(path_builder.build());
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        LineChange {
+            object_id: self.object_id,
+            start,
+            end,
+        }
+    }
+
     pub fn animate(&self, start: Pos2, end: Pos2) -> impl Motion {
         struct LineAnimation {
             object_id: ObjectId,
@@ -96,7 +127,7 @@ impl LineHandle {
 
                 match &mut world.objects.get_mut(&self.object_id).unwrap().object_kind {
                     ObjectKind::Model(ref mut model) => {
-                        model.path = path;
+                        model.update_path(path);
                     }
                     _ => unreachable!(),
                 }

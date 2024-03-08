@@ -154,8 +154,35 @@ impl Transform {
 // it.
 #[derive(Clone, Debug)]
 pub struct Model {
-    pub path: Path,
+    path: Path,
     pub material: Material,
+
+    /// This should be updated every time the path is updated. We use this to
+    /// check if the path has been updated, since paths are not hashable.
+    path_revision: usize,
+}
+
+impl Model {
+    pub fn new(path: Path, material: Material) -> Self {
+        Self {
+            path,
+            material,
+            path_revision: 0,
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn update_path(&mut self, path: Path) {
+        self.path = path;
+        self.path_revision += 1;
+    }
+
+    pub fn revision(&self) -> usize {
+        self.path_revision
+    }
 }
 
 pub type ObjectId = usize;
@@ -177,7 +204,11 @@ pub struct Object {
 impl Object {
     pub fn new_model(path: Path, material: Material) -> Self {
         Self {
-            object_kind: ObjectKind::Model(Model { path, material }),
+            object_kind: ObjectKind::Model(Model {
+                path,
+                material,
+                path_revision: 0,
+            }),
             transform: Transform::default(),
         }
     }

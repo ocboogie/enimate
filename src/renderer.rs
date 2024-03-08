@@ -1,4 +1,4 @@
-use crate::mesh::Vertex;
+use crate::mesh::{Mesh, Vertex};
 use crate::object_tree::{ObjectTree, RenderObject, RenderObjectKind};
 use eframe::wgpu::ColorTargetState;
 use eframe::{
@@ -254,6 +254,7 @@ struct LoadedMesh {
     pub transform_buffer: wgpu::Buffer,
     pub material_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
+    pub revision: usize,
 }
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
@@ -316,8 +317,13 @@ impl RendererResources {
                 transform_buffer,
                 material_buffer,
                 bind_group,
+                revision: object.mesh_revision,
             },
         );
+    }
+
+    fn delete_mesh(&mut self, id: MeshId) {
+        self.loaded_meshes.remove(&id);
     }
 
     fn update_mesh(queue: &wgpu::Queue, object: &RenderObject, loaded_objects: &LoadedMesh) {
@@ -366,8 +372,17 @@ impl RendererResources {
         //        frame. Should hashing be used to determine if the buffer
         //        needs to be updated?
         for object in &world.render() {
+            if object.mesh.vertices.is_empty() {
+                continue;
+            }
+
             if let Some(loaded_object) = self.loaded_meshes.get(&MeshId(object.kind, object.id)) {
-                Self::update_mesh(queue, object, loaded_object);
+                if loaded_object.revision != object.mesh_revision {
+                    self.delete_mesh(MeshId(object.kind, object.id));
+                    self.load_render_object(device, object);
+                } else {
+                    Self::update_mesh(queue, object, loaded_object);
+                }
             } else {
                 self.load_render_object(device, object);
             }

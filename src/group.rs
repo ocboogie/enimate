@@ -5,23 +5,6 @@ use crate::{
     object::{Object, ObjectId},
 };
 
-pub struct GroupBuilder<'a, B: Builder> {
-    builder: &'a mut B,
-    group_id: ObjectId,
-}
-
-impl<'a, B: Builder> Builder for GroupBuilder<'a, B> {
-    fn state(&mut self) -> &mut BuilderState {
-        self.builder.state()
-    }
-    fn play<A: Animation + 'static>(&mut self, animation: A) {
-        self.builder.play(animation);
-    }
-    fn rooted(&mut self) -> bool {
-        false
-    }
-}
-
 #[derive(Default)]
 pub struct Group {
     objects: Vec<Object>,
