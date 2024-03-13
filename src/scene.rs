@@ -1,9 +1,9 @@
 use crate::{
-    animation::{Animation, MotionAnimation, Time},
+    animation::{Animation, MotionAnimation},
     builder::{Builder, BuilderState},
     motion::{Alpha, Motion},
     object_tree::ObjectTree,
-    timing::{Sequence, Wait},
+    timing::{Sequence, Time, Wait},
     world::{Variable, World},
 };
 use std::collections::HashMap;

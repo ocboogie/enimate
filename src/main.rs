@@ -11,7 +11,7 @@ use object::{
 use renderer::Renderer;
 use scene::{Scene, SceneBuilder};
 use shapes::{Circle, Line};
-use spatial::Alignment;
+use spacing::Alignment;
 use std::collections::HashMap;
 use timing::{Concurrently, Sequence, Wait};
 
@@ -27,7 +27,7 @@ mod object_tree;
 mod renderer;
 mod scene;
 mod shapes;
-mod spatial;
+mod spacing;
 mod timing;
 mod trigger;
 mod utils;

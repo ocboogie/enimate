@@ -1,8 +1,10 @@
 use crate::{
-    animation::{Animation, GenericAnimation, Time},
+    animation::{Animation, GenericAnimation},
     motion::{Alpha, Motion},
     world::World,
 };
+
+pub type Time = f32;
 
 pub struct Wait;
 

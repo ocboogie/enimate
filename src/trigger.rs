@@ -1,6 +1,7 @@
 use crate::{
-    animation::{Animation, Time},
+    animation::Animation,
     motion::{Alpha, Motion},
+    timing::Time,
     world::World,
 };
 

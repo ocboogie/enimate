@@ -1,10 +1,8 @@
 use crate::{
     motion::{Alpha, Motion},
-    timing::Sequence,
+    timing::{Sequence, Time},
     world::World,
 };
-
-pub type Time = f32;
 
 pub trait Animation: Motion + 'static {
     fn duration(&self) -> Time;
