@@ -1,9 +1,9 @@
 use crate::{
     animation::Animation,
-    builder::{Builder, BuilderState},
+    builder::Builder,
     motion::{Alpha, Motion},
     object_tree::ObjectTree,
-    timing::{Sequence, Time, Wait},
+    timing::{Sequence, Time},
     world::{Variable, World},
 };
 use std::collections::HashMap;
@@ -43,28 +43,23 @@ impl Scene {
 }
 
 pub struct SceneBuilder {
-    state: BuilderState,
+    scene: Scene,
 }
 
 impl SceneBuilder {
     pub fn new() -> Self {
         Self {
-            state: BuilderState::new(),
+            scene: Scene::null(),
         }
     }
 
     pub fn finish(self) -> Scene {
-        self.state.scene
+        self.scene
     }
 }
 
 impl Builder for SceneBuilder {
-    fn state(&mut self) -> &mut BuilderState {
-        &mut self.state
-    }
-
     fn play<A: Animation + 'static>(&mut self, animation: A) {
-        self.state.emulate_motion(&animation);
-        (self.state.scene.0).0.push(Box::new(animation));
+        (self.scene.0).0.push(Box::new(animation));
     }
 }

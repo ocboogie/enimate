@@ -1,6 +1,6 @@
 use crate::{
     animation::Animation,
-    builder::{Builder, BuilderState},
+    builder::Builder,
     component::{Component, Handle},
     object::{Object, ObjectId},
 };

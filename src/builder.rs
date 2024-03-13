@@ -1,36 +1,11 @@
 use crate::{
     animation::Animation,
     component::Component,
-    motion::{AddObject, Motion},
+    motion::AddObject,
     object::{Object, ObjectId},
-    object_tree::ObjectTree,
-    scene::Scene,
-    world::World,
 };
-use std::collections::HashMap;
-
-pub struct BuilderState {
-    pub scene: Scene,
-    pub objects: ObjectTree,
-}
-
-impl BuilderState {
-    pub fn new() -> Self {
-        Self {
-            scene: Scene::null(),
-            objects: ObjectTree::new(),
-        }
-    }
-
-    pub fn emulate_motion(&mut self, motion: &dyn Motion) {
-        // Run the motion, so the state of objects is consistent with the end of the motion.
-        let world = &mut World::new(&mut self.objects, HashMap::new());
-        motion.animate(world, 1.0);
-    }
-}
 
 pub trait Builder: Sized {
-    fn state(&mut self) -> &mut BuilderState;
     fn play<A: Animation + 'static>(&mut self, animation: A);
     // Wheather new objects should be added to the root of the object tree.
     fn rooted(&mut self) -> bool {
@@ -103,9 +78,6 @@ pub struct GroupBuilder<'a, B: Builder> {
 }
 
 impl<'a, B: Builder> Builder for GroupBuilder<'a, B> {
-    fn state(&mut self) -> &mut BuilderState {
-        self.builder.state()
-    }
     fn play<A: Animation + 'static>(&mut self, animation: A) {
         self.builder.play(animation);
     }
