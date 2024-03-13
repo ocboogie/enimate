@@ -1,5 +1,6 @@
 use crate::animation::{Animation, MotionAnimation};
 use crate::dynamics::{Dynamic, DynamicTransform, DynamicType};
+use crate::easing::Easing;
 use crate::object::{Object, ObjectId, ObjectKind};
 use crate::scene::Scene;
 use crate::trigger::Trigger;
@@ -14,13 +15,14 @@ pub type Alpha = f32;
 pub trait Motion: 'static {
     fn animate(&self, world: &mut World, alpha: Alpha);
 
-    fn with_duration(self, duration: f32) -> impl Animation
+    fn with_duration(self, duration: f32) -> MotionAnimation<Self>
     where
         Self: Sized,
     {
         MotionAnimation {
             motion: self,
             duration,
+            easing: Easing::default(),
         }
     }
 }

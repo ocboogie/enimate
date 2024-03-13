@@ -1,5 +1,5 @@
 use crate::{
-    animation::{Animation, MotionAnimation},
+    animation::Animation,
     builder::{Builder, BuilderState},
     motion::{Alpha, Motion},
     object_tree::ObjectTree,
@@ -12,10 +12,7 @@ pub struct Scene(pub Sequence);
 
 impl Scene {
     pub fn null() -> Self {
-        Self(Sequence(vec![Box::new(MotionAnimation {
-            duration: 0.0,
-            motion: Wait,
-        })]))
+        Self(Sequence(vec![]))
     }
 
     pub fn length(&self) -> Time {

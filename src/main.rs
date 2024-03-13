@@ -2,6 +2,7 @@ use animation::{Animation, MotionAnimation};
 use builder::Builder;
 use component::{Component, Handle};
 use dynamics::DynamicType;
+use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
 use lyon::{math::point, path::Path};
 use motion::{AddObject, EmbededScene, FadeIn, Motion, Move};
@@ -19,6 +20,7 @@ mod animation;
 mod builder;
 mod component;
 mod dynamics;
+mod easing;
 mod group;
 mod mesh;
 mod motion;
@@ -209,27 +211,21 @@ fn stroke() -> Scene {
     let path = builder.build();
 
     let seq = Sequence(vec![
-        Box::new(MotionAnimation {
-            duration: 0.0,
-            motion: AddObject {
-                object: Object {
-                    object_kind: ObjectKind::Model(Model::new(
-                        path,
-                        Material {
-                            stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
-                            fill: Some(FillMaterial::new(Color32::WHITE)),
-                        },
-                    )),
-                    transform: Transform::default().with_scale(50.0),
-                },
-                object_id: rand::random::<usize>(),
-                rooted: true,
+        Box::new(AddObject {
+            object: Object {
+                object_kind: ObjectKind::Model(Model::new(
+                    path,
+                    Material {
+                        stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
+                        fill: Some(FillMaterial::new(Color32::WHITE)),
+                    },
+                )),
+                transform: Transform::default().with_scale(50.0),
             },
+            object_id: rand::random::<usize>(),
+            rooted: true,
         }),
-        Box::new(MotionAnimation {
-            duration: 5.0,
-            motion: Wait,
-        }),
+        Box::new(Wait.with_duration(5.0)),
     ]);
 
     Scene(seq)
@@ -252,22 +248,17 @@ fn animations() -> Scene {
 
         let mut seq = Sequence::default();
 
-        seq.add(MotionAnimation {
-            duration: 0.1 * i as f32,
-            motion: Wait,
-        });
+        seq.add(Wait.with_duration(0.1 * i as f32));
         seq.add(MotionAnimation {
             duration: 0.3,
             motion: FadeIn { object_id: circle },
+            easing: Easing::Linear,
         });
         c.add(seq);
     }
 
     b.play(c);
-    b.play(MotionAnimation {
-        duration: 5.0,
-        motion: Wait,
-    });
+    b.play(Wait.with_duration(5.0));
 
     b.finish()
 }
@@ -295,6 +286,7 @@ fn movement() -> Scene {
             from: pos2(-50.0, 100.0).d(),
             to: pos2(50.0, 100.0).d(),
         },
+        easing: EaseInOut,
     });
     c.add(MotionAnimation {
         duration: 2.0,
@@ -303,6 +295,7 @@ fn movement() -> Scene {
             from: pos2(-50.0, -100.0).d(),
             to: pos2(50.0, -100.0).d(),
         },
+        easing: EaseInOut,
     });
     b.play(c);
 
@@ -361,7 +354,8 @@ fn dynamic_alignment() -> Scene {
             from: Alignment::new(right_circle).center().d(),
             to: pos2(100.0, -100.0).d(),
         }
-        .with_duration(1.0),
+        .with_duration(1.0)
+        .with_easing(EaseInOut),
     );
 
     c.add(
@@ -370,7 +364,8 @@ fn dynamic_alignment() -> Scene {
             from: Alignment::new(left_circle).center().d(),
             to: Alignment::new(right_circle).left().d(),
         }
-        .with_duration(1.0),
+        .with_duration(1.0)
+        .with_easing(EaseInOut),
     );
 
     b.play(c);
