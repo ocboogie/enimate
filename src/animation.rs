@@ -1,6 +1,6 @@
 use crate::{
     motion::{Alpha, Motion},
-    temporal::Sequence,
+    timing::Sequence,
     world::World,
 };
 

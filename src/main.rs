@@ -13,7 +13,7 @@ use scene::{Scene, SceneBuilder};
 use shapes::{Circle, Line};
 use spatial::Alignment;
 use std::collections::HashMap;
-use temporal::{Concurrently, Sequence, Wait};
+use timing::{Concurrently, Sequence, Wait};
 
 mod animation;
 mod builder;
@@ -28,7 +28,7 @@ mod renderer;
 mod scene;
 mod shapes;
 mod spatial;
-mod temporal;
+mod timing;
 mod trigger;
 mod utils;
 mod world;

@@ -3,7 +3,7 @@ use crate::{
     builder::{Builder, BuilderState},
     motion::{Alpha, Motion},
     object_tree::ObjectTree,
-    temporal::{Sequence, Wait},
+    timing::{Sequence, Wait},
     world::{Variable, World},
 };
 use std::collections::HashMap;
