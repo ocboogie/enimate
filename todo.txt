@@ -1,9 +1,12 @@
- - Either simulate strokes on the CPU by sending two meshes to the GPU as
+ - [x] Either simulate strokes on the CPU by sending two meshes to the GPU as
    different draw calls, or implement it into the shader?
- - Add scenes in scenes that have different time scales (i.e., I could have a 
+ - [x] Add scenes in scenes that have different time scales (i.e., I could have a 
    scene in a scene that has a specific range of time and a different time scale
- - Add debugging tech like outlines and wireframes (perhaps in the shader)
+ - [x] Add debugging tech like outlines and wireframes (perhaps in the shader)
  - Make motions more efficient by using references for their objects 
    and have the Motion trait have a lifetime
- - Root motions should not be in builder state 
-   - Actually should probably refactor the whole thing
+ - [x] Root motions should not be in builder state 
+   - [x] Actually should probably refactor the whole thing
+ - [ ] Move everything to cgmath instead of using bits of egui
+ - [ ] MoveTo -> MoveTo Hard to do because of the way the builder pattern works
+ - [ ] Maybe motions should be called commands?

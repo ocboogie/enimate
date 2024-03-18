@@ -5,12 +5,25 @@ pub type Variable = usize;
 
 pub struct World<'a> {
     pub objects: &'a mut ObjectTree,
+    render_size: (f32, f32),
     variables: HashMap<Variable, f32>,
 }
 
 impl<'a> World<'a> {
-    pub fn new(objects: &'a mut ObjectTree, variables: HashMap<Variable, f32>) -> Self {
-        Self { objects, variables }
+    pub fn new(
+        objects: &'a mut ObjectTree,
+        render_size: (f32, f32),
+        variables: HashMap<Variable, f32>,
+    ) -> Self {
+        Self {
+            objects,
+            render_size,
+            variables,
+        }
+    }
+
+    pub fn render_size(&self) -> (f32, f32) {
+        self.render_size
     }
 
     pub fn update_variable(&mut self, variable: Variable, value: f32) {

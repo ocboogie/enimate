@@ -1,5 +1,13 @@
-use crate::{component::Handle, dynamics::DynamicType, object::ObjectId, world::World};
+use crate::{dynamics::DynamicType, object::ObjectId, renderer::UNIT_GRID_HEIGHT, world::World};
 use egui::Pos2;
+
+pub struct Pixels(f32);
+
+impl DynamicType<f32> for Pixels {
+    fn get(&self, world: &World) -> f32 {
+        self.0 * (world.render_size().1 / UNIT_GRID_HEIGHT)
+    }
+}
 
 pub enum HorizontalAlignment {
     Left,

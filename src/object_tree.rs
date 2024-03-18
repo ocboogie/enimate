@@ -84,7 +84,7 @@ impl ObjectTree {
         });
 
         tessellator
-            .tessellate_path(path, &FillOptions::default(), &mut buffers_builder)
+            .tessellate_path(path, &FillOptions::tolerance(0.001), &mut buffers_builder)
             .unwrap();
 
         Mesh {

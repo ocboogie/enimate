@@ -23,18 +23,23 @@ impl Scene {
         time / self.length()
     }
 
-    pub fn render_at(&self, time: Time) -> ObjectTree {
+    pub fn render_at(&self, time: Time, render_size: (f32, f32)) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, HashMap::new());
+        let mut world = World::new(&mut objects, render_size, HashMap::new());
 
         self.0.animate(&mut world, self.time_to_alpha(time));
 
         objects
     }
 
-    pub fn render_with_input(&mut self, time: f32, input: HashMap<Variable, f32>) -> ObjectTree {
+    pub fn render_with_input(
+        &mut self,
+        time: f32,
+        render_size: (f32, f32),
+        input: HashMap<Variable, f32>,
+    ) -> ObjectTree {
         let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, input);
+        let mut world = World::new(&mut objects, render_size, input);
 
         self.0.animate(&mut world, self.time_to_alpha(time));
 

@@ -5,10 +5,8 @@ use dynamics::DynamicType;
 use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
 use lyon::{math::point, path::Path};
-use motion::{AddObject, EmbededScene, FadeIn, Motion, Move};
-use object::{
-    FillMaterial, Material, Model, Object, ObjectId, ObjectKind, StrokeMaterial, Transform,
-};
+use motion::{EmbededScene, FadeIn, Motion, Move};
+use object::{FillMaterial, Material, Model, Object, ObjectId, StrokeMaterial, Transform};
 use renderer::Renderer;
 use scene::{Scene, SceneBuilder};
 use shapes::{Circle, Line};
@@ -135,7 +133,10 @@ impl eframe::App for App {
                     input.insert(1, pos.y);
 
                     let current_time = self.current_time;
-                    let objects = self.scene_mut().render_with_input(current_time, input);
+                    let size = rect.size();
+                    let objects =
+                        self.scene_mut()
+                            .render_with_input(current_time, (size.x, size.y), input);
 
                     let boxes = objects.bounding_boxes();
 
@@ -192,6 +193,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // ("Variables", variables()),
                     ("Scenes", embedded_scenes()),
                     ("Dynamic Alignment", dynamic_alignment()),
+                    ("Render Grid", render_grid()),
                     ("Grid", grid()),
                 ],
             ))
@@ -210,25 +212,22 @@ fn stroke() -> Scene {
     builder.close();
     let path = builder.build();
 
-    let seq = Sequence(vec![
-        Box::new(AddObject {
-            object: Object {
-                object_kind: ObjectKind::Model(Model::new(
-                    path,
-                    Material {
-                        stroke: Some(StrokeMaterial::new(Color32::RED, 0.2)),
-                        fill: Some(FillMaterial::new(Color32::WHITE)),
-                    },
-                )),
-                transform: Transform::default().with_scale(50.0),
-            },
-            object_id: rand::random::<usize>(),
-            rooted: true,
-        }),
-        Box::new(Wait.with_duration(5.0)),
-    ]);
+    let mut b = SceneBuilder::new();
 
-    Scene(seq)
+    b.add::<Object>(
+        Model::new(
+            path,
+            Material {
+                stroke: Some(StrokeMaterial::new(Color32::RED, 0.1)),
+                fill: Some(FillMaterial::new(Color32::WHITE)),
+            },
+        )
+        .into(),
+    );
+
+    b.play(Wait.with_duration(5.0));
+
+    b.finish()
 }
 
 fn animations() -> Scene {
@@ -238,11 +237,8 @@ fn animations() -> Scene {
 
     for i in 0..9 {
         let circle = b.add(Circle {
-            radius: 50.0,
-            center: pos2(
-                (i % 3) as f32 * 100.0 - 100.0,
-                (i / 3) as f32 * 100.0 - 100.0,
-            ),
+            radius: 0.5,
+            center: pos2((i % 3) as f32 * 1.0 - 1.0, (i / 3) as f32 * 1.0 - 1.0),
             material: FillMaterial::new(Color32::RED).into(),
         });
 
@@ -267,36 +263,36 @@ fn movement() -> Scene {
     let mut b = SceneBuilder::new();
 
     let circle_a = b.add(Circle {
-        radius: 50.0,
-        center: pos2(0.0, 0.0),
+        radius: 1.0,
+        center: pos2(-1.0, 1.0),
         material: FillMaterial::new(Color32::RED).into(),
     });
     let circle_b = b.add(Circle {
-        radius: 50.0,
+        radius: 1.0,
         center: pos2(0.0, 0.0),
         material: FillMaterial::new(Color32::BLUE).into(),
     });
 
     let mut c = Concurrently::default();
 
-    c.add(MotionAnimation {
-        duration: 1.0,
-        motion: Move {
+    c.add(
+        Move {
             object_id: circle_a,
-            from: pos2(-50.0, 100.0).d(),
-            to: pos2(50.0, 100.0).d(),
-        },
-        easing: EaseInOut,
-    });
-    c.add(MotionAnimation {
-        duration: 2.0,
-        motion: Move {
+            from: pos2(-1.0, 2.0).d(),
+            to: pos2(1.0, 2.0).d(),
+        }
+        .with_duration(1.0)
+        .with_easing(Easing::EaseInOut),
+    );
+    c.add(
+        Move {
             object_id: circle_b,
-            from: pos2(-50.0, -100.0).d(),
-            to: pos2(50.0, -100.0).d(),
-        },
-        easing: EaseInOut,
-    });
+            from: pos2(-1.0, -2.0).d(),
+            to: pos2(1.0, -2.0).d(),
+        }
+        .with_duration(1.0)
+        .with_easing(Easing::Linear),
+    );
     b.play(c);
 
     b.finish()
@@ -309,7 +305,7 @@ pub fn embedded_scenes() -> Scene {
     c.add(EmbededScene {
         scene: animations(),
         transform: Transform::default()
-            .with_position(pos2(-100.0, 0.0))
+            .with_position(pos2(-2.0, 0.0))
             .with_scale(0.5)
             .into(),
         speed: 1.0,
@@ -319,7 +315,7 @@ pub fn embedded_scenes() -> Scene {
     c.add(EmbededScene {
         scene: movement(),
         transform: Transform::default()
-            .with_position(pos2(100.0, 0.0))
+            .with_position(pos2(2.0, 0.0))
             .with_scale(0.5)
             .into(),
         speed: 1.0,
@@ -336,13 +332,13 @@ fn dynamic_alignment() -> Scene {
     let mut b = SceneBuilder::new();
 
     let right_circle = b.add(Circle {
-        radius: 25.0,
-        center: pos2(100.0, 100.0),
+        radius: 0.5,
+        center: pos2(1.0, 1.0),
         material: FillMaterial::new(Color32::RED).into(),
     });
     let left_circle = b.add(Circle {
-        radius: 25.0,
-        center: pos2(-100.0, 100.0),
+        radius: 0.5,
+        center: pos2(-1.0, 1.0),
         material: FillMaterial::new(Color32::BLUE).into(),
     });
 
@@ -352,7 +348,7 @@ fn dynamic_alignment() -> Scene {
         Move {
             object_id: right_circle,
             from: Alignment::new(right_circle).center().d(),
-            to: pos2(100.0, -100.0).d(),
+            to: pos2(1.0, -1.0).d(),
         }
         .with_duration(1.0)
         .with_easing(EaseInOut),
@@ -376,18 +372,12 @@ fn dynamic_alignment() -> Scene {
 fn grid() -> Scene {
     let mut b = SceneBuilder::new();
 
-    let line = b.add(Line {
-        start: pos2(0.0, 0.0),
-        end: pos2(0.0, 0.0),
-        material: StrokeMaterial::new(Color32::BLUE, 5.0).into(),
-    });
-
-    let grid = b.add(Grid {
+    b.add(Grid {
         rows: 10,
         cols: 10,
-        width: 300.0,
-        height: 300.0,
-        material: StrokeMaterial::new(Color32::BLUE, 1.0).into(),
+        width: 8.0,
+        height: 8.0,
+        material: StrokeMaterial::new(Color32::BLUE, 0.1).into(),
     });
 
     b.finish()
@@ -418,7 +408,7 @@ impl Component for Grid {
         let mut c = Concurrently::default();
 
         let grid = builder.group(|group| {
-            let horizontal_lines = group.group(|group| {
+            group.group(|group| {
                 for i in 0..=self.rows {
                     let x = -self.width / 2.0;
                     let y = (i as f32 / self.rows as f32) * self.height - self.height / 2.0;
@@ -438,7 +428,7 @@ impl Component for Grid {
                 }
             });
 
-            let vertical_lines = group.group(|group| {
+            group.group(|group| {
                 for i in 0..=self.cols {
                     let x = (i as f32 / self.cols as f32) * self.width - self.width / 2.0;
                     let y = -self.height / 2.0;
@@ -463,4 +453,20 @@ impl Component for Grid {
 
         grid
     }
+}
+
+fn render_grid() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    for y in 0..=8 {
+        for x in 0..16 {
+            b.add(Circle {
+                radius: 0.1,
+                center: pos2(x as f32 - 8.0, y as f32 - 4.0),
+                material: FillMaterial::new(Color32::RED).into(),
+            });
+        }
+    }
+
+    b.finish()
 }

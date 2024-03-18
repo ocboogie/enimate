@@ -9,6 +9,8 @@ use egui::{Color32, Rect, Rgba};
 use rand::Rng;
 use std::collections::HashMap;
 
+pub const UNIT_GRID_HEIGHT: f32 = 8.0;
+
 struct RendererResourceManager(pub HashMap<usize, RendererResources>);
 
 pub struct Renderer {
@@ -55,7 +57,7 @@ impl Renderer {
         // Since we don't know the screen size yet, we don't initialize the camera buffer yet
         let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Camera Buffer"),
-            size: 16,
+            size: 32,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
             mapped_at_creation: false,
         });
@@ -359,13 +361,20 @@ impl RendererResources {
         world: &ObjectTree,
         render_size: egui::Vec2,
     ) {
+        let transform: Vec<f32> = vec![
+            (render_size.y / render_size.x) * (1.0 / UNIT_GRID_HEIGHT) * 2.0,
+            0.0,
+            0.0,
+            -(1.0 / UNIT_GRID_HEIGHT) * 2.0,
+        ];
         queue.write_buffer(
             &self.camera_buffer,
             0,
-            // Since we are using a 2D orthographic camera, we can just use a 2x2 matrix.
-            // Also, we want the origin to be at the top left corner, so we need to flip
-            // the y axis, since NDC has the origin at the bottom left corner.
-            bytemuck::cast_slice(&vec![1.0 / render_size.x, 0.0, 0.0, -1.0 / render_size.y]),
+            // bytemuck::cast_slice(&vec![1.0, 0.0, 0.0, -0.998993]),
+            // bytemuck::cast_slice(&vec![1.0, 0.0, 0.0, -248.25 / 248.25]),
+            // bytemuck::cast_slice(&transform),
+            // bytemuck::cast_slice(&vec![100.0 / render_size.x, 0.0, 0.0, -100.0 / render_size.y]),
+            bytemuck::cast_slice(&transform),
         );
 
         // FIXME: Bad performance, since it is updating the entire buffer every

@@ -51,9 +51,16 @@ impl Motion for EmbededScene {
     fn animate(&self, world: &mut World, alpha: Alpha) {
         let transform = self.transform.get(world);
 
-        let objects = self
-            .scene
-            .render_at(self.scene.length() * alpha * self.speed);
+        let render_size = world.render_size();
+        let adjusted_render_size = (
+            render_size.0 / transform.scale,
+            render_size.1 / transform.scale,
+        );
+
+        let objects = self.scene.render_at(
+            self.scene.length() * alpha * self.speed,
+            adjusted_render_size,
+        );
 
         let children = world.objects.merge(objects, self.object_id);
 
@@ -107,24 +114,6 @@ impl Motion for Move {
             .unwrap()
             .transform
             .position = pos;
-    }
-}
-
-pub struct MoveTo {
-    to: Dynamic<Pos2>,
-    object_id: usize,
-}
-
-impl Trigger for MoveTo {
-    fn trigger(&self, world: &mut World) {
-        let to = self.to.get(world);
-
-        world
-            .objects
-            .get_mut(&self.object_id)
-            .unwrap()
-            .transform
-            .position = to;
     }
 }
 

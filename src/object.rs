@@ -242,3 +242,12 @@ impl Object {
     //
     // }
 }
+
+impl From<Model> for Object {
+    fn from(model: Model) -> Self {
+        Self {
+            object_kind: ObjectKind::Model(model),
+            transform: Transform::default(),
+        }
+    }
+}
