@@ -13,6 +13,7 @@ use shapes::{Circle, Line};
 use spacing::Alignment;
 use std::collections::HashMap;
 use timing::{Concurrently, Sequence, Wait};
+use typst::Typst;
 
 mod animation;
 mod builder;
@@ -30,6 +31,7 @@ mod shapes;
 mod spacing;
 mod timing;
 mod trigger;
+mod typst;
 mod utils;
 mod world;
 
@@ -195,6 +197,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ("Dynamic Alignment", dynamic_alignment()),
                     ("Render Grid", render_grid()),
                     ("Grid", grid()),
+                    ("Typst", typst_example()),
                 ],
             ))
         }),
@@ -467,6 +470,19 @@ fn render_grid() -> Scene {
             });
         }
     }
+
+    b.finish()
+}
+
+fn typst_example() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    b.add(Typst {
+        text: r#"
+#rect(width: 35%, height: 30pt)"#
+            .to_string(),
+        material: FillMaterial::new(Color32::RED).into(),
+    });
 
     b.finish()
 }
