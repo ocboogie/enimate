@@ -1,6 +1,6 @@
 use animation::{Animation, MotionAnimation};
 use builder::Builder;
-use component::{Component, Handle};
+use component::{Component, ComponentExt, Handle};
 use dynamics::DynamicType;
 use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
@@ -22,10 +22,12 @@ mod component;
 mod dynamics;
 mod easing;
 mod group;
+mod interpolation;
 mod mesh;
 mod motion;
 mod object;
 mod object_tree;
+mod properties;
 mod renderer;
 mod scene;
 mod shapes;
@@ -240,11 +242,13 @@ fn animations() -> Scene {
     let mut c = Concurrently(Vec::new());
 
     for i in 0..9 {
-        let circle = b.add(Circle {
-            radius: 0.5,
-            center: pos2((i % 3) as f32 * 1.0 - 1.0, (i / 3) as f32 * 1.0 - 1.0),
-            material: FillMaterial::new(Color32::RED).into(),
-        });
+        let circle = b.add(
+            Circle {
+                radius: 0.5,
+                material: FillMaterial::new(Color32::RED).into(),
+            }
+            .with_position(pos2((i % 3) as f32 * 1.0 - 1.0, (i / 3) as f32 * 1.0 - 1.0)),
+        );
 
         let mut seq = Sequence::default();
 
@@ -268,12 +272,10 @@ fn movement() -> Scene {
 
     let circle_a = b.add(Circle {
         radius: 1.0,
-        center: pos2(-1.0, 2.0),
         material: FillMaterial::new(Color32::RED).into(),
     });
     let circle_b = b.add(Circle {
         radius: 1.0,
-        center: pos2(-1.0, -2.0),
         material: FillMaterial::new(Color32::BLUE).into(),
     });
 
@@ -281,13 +283,17 @@ fn movement() -> Scene {
 
     c.add(
         circle_a
-            .move_to(pos2(1.0, 2.0).d())
+            .transform
+            .position()
+            .animate_from(pos2(-1.0, 2.0).d(), pos2(1.0, 2.0).d())
             .with_duration(1.0)
             .with_easing(Easing::EaseInOut),
     );
     c.add(
         circle_b
-            .move_to(pos2(1.0, -2.0).d())
+            .transform
+            .position()
+            .animate_from(pos2(-1.0, -2.0).d(), pos2(1.0, -2.0).d())
             .with_duration(1.0)
             .with_easing(Easing::Linear),
     );
@@ -329,16 +335,20 @@ pub fn embedded_scenes() -> Scene {
 fn dynamic_alignment() -> Scene {
     let mut b = SceneBuilder::new();
 
-    let right_circle = b.add(Circle {
-        radius: 0.5,
-        center: pos2(1.0, 1.0),
-        material: FillMaterial::new(Color32::RED).into(),
-    });
-    let left_circle = b.add(Circle {
-        radius: 0.5,
-        center: pos2(-1.0, 1.0),
-        material: FillMaterial::new(Color32::BLUE).into(),
-    });
+    let right_circle = b.add(
+        Circle {
+            radius: 0.5,
+            material: FillMaterial::new(Color32::RED).into(),
+        }
+        .with_position(pos2(1.0, 1.0)),
+    );
+    let left_circle = b.add(
+        Circle {
+            radius: 0.5,
+            material: FillMaterial::new(Color32::BLUE).into(),
+        }
+        .with_position(pos2(-1.0, 1.0)),
+    );
 
     let mut c = Concurrently::default();
 
@@ -444,11 +454,13 @@ fn render_grid() -> Scene {
 
     for y in 0..=8 {
         for x in 0..16 {
-            b.add(Circle {
-                radius: 0.1,
-                center: pos2(x as f32 - 8.0, y as f32 - 4.0),
-                material: FillMaterial::new(Color32::RED).into(),
-            });
+            b.add(
+                Circle {
+                    radius: 0.1,
+                    material: FillMaterial::new(Color32::RED).into(),
+                }
+                .with_position(pos2(x as f32 - 8.0, y as f32 - 4.0)),
+            );
         }
     }
 

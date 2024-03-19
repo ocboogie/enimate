@@ -3,6 +3,7 @@ use crate::{
     component::{Component, Handle},
     motion::AddObject,
     object::{Object, ObjectId},
+    properties::TransformProperty,
 };
 
 pub trait Builder: Sized {
@@ -14,14 +15,16 @@ pub trait Builder: Sized {
             builder: self,
             objects: Vec::new(),
         };
+        let transform = component.transform();
 
         let handle = component.build(&mut component_builder);
 
-        let object = Object::new_group(component_builder.objects);
+        let object = Object::new_group(component_builder.objects).with_transform(transform);
         let object_id = self.add_object(object);
 
         Handle {
             inner: handle,
+            transform: TransformProperty(object_id),
             object_id,
         }
     }

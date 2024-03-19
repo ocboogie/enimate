@@ -9,13 +9,17 @@ use crate::{
     component::{Component, Handle},
     motion::Motion,
     object::{Material, Object, ObjectId, ObjectKind, Transform},
+    properties::Property,
     world::World,
 };
 
 pub struct Circle {
-    pub center: Pos2,
     pub radius: f32,
     pub material: Material,
+}
+
+pub struct CircleHandle {
+    radius: Property<f32>,
 }
 
 impl Component for Circle {
@@ -25,8 +29,7 @@ impl Component for Circle {
         let mut path_builder = Path::builder();
         path_builder.add_circle(point(0.0, 0.0), self.radius, Winding::Positive);
 
-        let object = Object::new_model(path_builder.build(), self.material)
-            .with_transform(Transform::default().with_position(self.center));
+        let object = Object::new_model(path_builder.build(), self.material);
 
         builder.add_object(object)
     }
