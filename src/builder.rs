@@ -37,6 +37,9 @@ pub struct ComponentBuilder<'a, B: Builder> {
 
 impl<'a, B: Builder> Builder for ComponentBuilder<'a, B> {
     fn play<A: Animation + 'static>(&mut self, animation: A) {
+        if animation.duration() != 0.0 {
+            panic!("Animations with duration are not supported in components");
+        }
         self.builder.play(animation);
     }
 
