@@ -117,6 +117,30 @@ impl Motion for Move {
     }
 }
 
+pub struct MoveTo {
+    pub to: Dynamic<Pos2>,
+    pub object_id: usize,
+}
+
+impl Motion for MoveTo {
+    fn animate(&self, world: &mut World, alpha: Alpha) {
+        let to = self.to.get(world);
+        let from = world
+            .objects
+            .get(&self.object_id)
+            .unwrap()
+            .transform
+            .position;
+
+        Move {
+            from: from.d(),
+            to: to.d(),
+            object_id: self.object_id,
+        }
+        .animate(world, alpha);
+    }
+}
+
 pub struct FadeIn {
     pub object_id: usize,
 }

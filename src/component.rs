@@ -1,10 +1,9 @@
 use egui::Pos2;
 
 use crate::builder::Builder;
-use crate::dynamics::Dynamic;
-use crate::motion::{Alpha, Motion, Move};
+use crate::dynamics::{Dynamic, DynamicType};
+use crate::motion::MoveTo;
 use crate::object::{Object, ObjectId};
-use crate::world::World;
 
 pub trait Handle {
     fn id(&self) -> ObjectId;
@@ -29,3 +28,14 @@ impl Component for Object {
         builder.add_new_object(self)
     }
 }
+
+pub trait HandleExt: Handle {
+    fn move_to(&self, pos: Dynamic<Pos2>) -> MoveTo {
+        MoveTo {
+            to: pos,
+            object_id: self.id(),
+        }
+    }
+}
+
+impl<T: Handle> HandleExt for T {}

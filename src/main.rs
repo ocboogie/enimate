@@ -1,6 +1,6 @@
 use animation::{Animation, MotionAnimation};
 use builder::Builder;
-use component::{Component, Handle};
+use component::{Component, Handle, HandleExt};
 use dynamics::DynamicType;
 use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
@@ -267,34 +267,28 @@ fn movement() -> Scene {
 
     let circle_a = b.add(Circle {
         radius: 1.0,
-        center: pos2(-1.0, 1.0),
+        center: pos2(-1.0, 2.0),
         material: FillMaterial::new(Color32::RED).into(),
     });
     let circle_b = b.add(Circle {
         radius: 1.0,
-        center: pos2(0.0, 0.0),
+        center: pos2(-1.0, -2.0),
         material: FillMaterial::new(Color32::BLUE).into(),
     });
 
     let mut c = Concurrently::default();
 
     c.add(
-        Move {
-            object_id: circle_a,
-            from: pos2(-1.0, 2.0).d(),
-            to: pos2(1.0, 2.0).d(),
-        }
-        .with_duration(1.0)
-        .with_easing(Easing::EaseInOut),
+        circle_a
+            .move_to(pos2(1.0, 2.0).d())
+            .with_duration(1.0)
+            .with_easing(Easing::EaseInOut),
     );
     c.add(
-        Move {
-            object_id: circle_b,
-            from: pos2(-1.0, -2.0).d(),
-            to: pos2(1.0, -2.0).d(),
-        }
-        .with_duration(1.0)
-        .with_easing(Easing::Linear),
+        circle_b
+            .move_to(pos2(1.0, -2.0).d())
+            .with_duration(1.0)
+            .with_easing(Easing::Linear),
     );
     b.play(c);
 
