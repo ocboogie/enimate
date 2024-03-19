@@ -6,6 +6,7 @@ use crate::{
     interpolation::Interpolatable,
     motion::{Alpha, Motion},
     object::{ObjectId, Transform},
+    trigger::Trigger,
     world::World,
 };
 
@@ -84,14 +85,14 @@ struct PropertySet<T: Interpolatable> {
     value: Dynamic<T>,
 }
 
-impl<T: Interpolatable> Motion for PropertySet<T> {
-    fn animate(&self, world: &mut World, _alpha: Alpha) {
+impl<T: Interpolatable> Trigger for PropertySet<T> {
+    fn trigger(&self, world: &mut World) {
         self.property.0.update(world, self.value.get(world));
     }
 }
 
 impl<T: Interpolatable> Property<T> {
-    pub fn set(&self, value: Dynamic<T>) -> impl Motion {
+    pub fn set(&self, value: Dynamic<T>) -> impl Trigger {
         PropertySet {
             property: self.clone(),
             value,
