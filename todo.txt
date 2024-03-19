@@ -14,9 +14,10 @@
        animations).
  - [ ] Custom typst renderer with no svg needed, check the SVG renderer as 
        a reference
- - [ ] `BuilderExt` and `HandlerExt`
+ - [x] `BuilderExt` and `HandlerExt`
  - [ ] `Builder` should really only have `.play` and `.add`/`.build` methods
- - [ ] `Interpolatable` trait?
+ - [x] `Interpolatable` trait?
  - [ ] Figure out the error handling story for motions and components
  - [ ] Collect `Component`s into group
- - [ ] `Property<T, Updater>` struct that can be used to 
+ - [x] `Property<T, Updater>` struct that can be used to 
+ - [ ] Split into `core`, `egui`, and builder modules

@@ -454,12 +454,17 @@ fn render_grid() -> Scene {
 
     for y in 0..=8 {
         for x in 0..16 {
-            b.add(
-                Circle {
+            let circle = b
+                .add(Circle {
                     radius: 0.1,
                     material: FillMaterial::new(Color32::RED).into(),
-                }
-                .with_position(pos2(x as f32 - 8.0, y as f32 - 4.0)),
+                })
+                .with_posotion(pos2(x as f32 - 8.0, y as f32 - 4.0));
+            b.play(
+                circle
+                    .transform
+                    .position()
+                    .set(pos2(x as f32 - 8.0, y as f32 - 4.0).d()),
             );
         }
     }
