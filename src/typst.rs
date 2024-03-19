@@ -1,12 +1,14 @@
 use crate::{
     builder::Builder,
-    component::Component,
+    component::{Component, Handle},
+    group::Group,
     object::{FillMaterial, Material, Object, ObjectId, StrokeMaterial},
     Transform,
 };
 use comemo::Prehashed;
-use egui::{pos2, Pos2};
+use egui::{pos2, vec2, Pos2};
 use lyon::{
+    algorithms::aabb::bounding_box,
     geom::Point,
     lyon_tessellation::{FillTessellator, StrokeTessellator},
     path::Path,
@@ -23,17 +25,18 @@ use typst::{
 };
 use typst_svg::svg_merged;
 
+/// How many Tpyst points are in a enimate unit.
 const POINTS_PER_UNIT: f32 = 24.0;
 
 static LIBRARY: Lazy<Prehashed<Library>> = Lazy::new(|| {
     let mut lib = Library::default();
-    lib.styles
-        .set(PageElem::set_width(Smart::Custom(Abs::pt(240.0).into())));
-    lib.styles.set(PageElem::set_height(Smart::Auto));
-    lib.styles
-        .set(PageElem::set_margin(Margin::splat(Some(Smart::Custom(
-            Abs::pt(0.0).into(),
-        )))));
+    // lib.styles
+    //     .set(PageElem::set_width(Smart::Custom(Abs::pt(240.0).into())));
+    // lib.styles.set(PageElem::set_height(Smart::Auto));
+    // lib.styles
+    //     .set(PageElem::set_margin(Margin::splat(Some(Smart::Custom(
+    //         Abs::pt(0.0).into(),
+    //     )))));
     Prehashed::new(lib)
 });
 
@@ -105,31 +108,40 @@ impl Component for Typst {
 
         let svg = svg_merged(&document, Abs::pt(0.0).into());
 
-        println!("{}", svg);
-
         let opt = usvg::Options::default();
         let rtree = usvg::Tree::from_data(svg.as_bytes(), &opt).unwrap();
 
-        builder.group(|group| {
-            for node in rtree.root().descendants() {
-                if let usvg::NodeKind::Path(ref p) = *node.borrow() {
-                    let flip_y = p.transform.d < 0.0;
-                    let path = convert_path(p, flip_y);
+        let mut group = Group::new();
 
-                    let mut transform = convert_transform(&p.transform);
+        let rect = &rtree.svg_node().view_box.rect;
+        let offset = vec2(
+            (rect.x() + rect.width() / 2.0) as f32,
+            (rect.y() + rect.height() / 2.0) as f32,
+        );
 
-                    transform.position = pos2(
-                        transform.position.x / POINTS_PER_UNIT,
-                        transform.position.y / POINTS_PER_UNIT,
-                    );
-                    transform.scale /= POINTS_PER_UNIT;
+        for node in rtree.root().descendants() {
+            if let usvg::NodeKind::Path(ref p) = *node.borrow() {
+                let flip_y = p.transform.d < 0.0;
+                let path = convert_path(p, flip_y);
 
-                    group.add_new_object(
-                        Object::new_model(path, self.material.clone()).with_transform(transform),
-                    );
-                }
+                let mut transform = convert_transform(&p.transform);
+
+                transform.position = pos2(
+                    transform.position.x / POINTS_PER_UNIT,
+                    transform.position.y / POINTS_PER_UNIT,
+                );
+                transform.scale /= POINTS_PER_UNIT;
+
+                group.add(Object::new_model(path, self.material.clone()).with_transform(transform));
             }
-        })
+        }
+
+        builder
+            .add(group.with_transform(Transform {
+                position: pos2(offset.x / POINTS_PER_UNIT, offset.y / POINTS_PER_UNIT),
+                ..Default::default()
+            }))
+            .id()
     }
 }
 
@@ -138,6 +150,7 @@ fn convert_path(p: &usvg::Path, flip_y: bool) -> Path {
 
     let flipper = if flip_y { -1.0 } else { 1.0 };
 
+    // Taken from https://github.com/jpopesculian/lyon-usvg/blob/master/src/lib.rs#L79
     for segment in p.data.iter() {
         match *segment {
             usvg::PathSegment::MoveTo { x, y } => {

@@ -1,6 +1,7 @@
 use crate::{
     animation::Animation,
     component::Component,
+    group::Group,
     motion::AddObject,
     object::{Object, ObjectId},
 };
@@ -51,24 +52,22 @@ pub trait Builder: Sized {
         object_id
     }
 
-    // TODO: Potential bug: since we add the group at the end, the children
-    // disconnect from the root, until after the group is added. This may
-    // cause problems trying to get the bounding box of a child, for example.
-    fn group(&mut self, group_builder: impl FnOnce(&mut GroupBuilder<Self>)) -> ObjectId {
-        let group_id = rand::random::<ObjectId>();
-        let mut group_build = GroupBuilder {
-            builder: self,
-            group_id,
-            children: Vec::new(),
-        };
-        group_builder(&mut group_build);
-
-        let children = group_build.children;
-
-        self.add_object(group_id, Object::new_group(children));
-
-        group_id
-    }
+    // // TODO: Potential bug: since we add the group at the end, the children
+    // // disconnect from the root, until after the group is added. This may
+    // // cause problems trying to get the bounding box of a child, for example.
+    // fn group(&mut self, group_builder: impl FnOnce(&mut GroupBuilder<Self>)) -> Group {
+    //     let group_id = rand::random::<ObjectId>();
+    //     let mut group_build = GroupBuilder {
+    //         builder: self,
+    //         group_id,
+    //         children: Vec::new(),
+    //     };
+    //     group_builder(&mut group_build);
+    //
+    //     let children = group_build.children;
+    //
+    //     Group::from_objects(children)
+    // }
 }
 
 pub struct GroupBuilder<'a, B: Builder> {

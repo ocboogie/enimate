@@ -4,12 +4,13 @@ use component::{Component, Handle, HandleExt};
 use dynamics::DynamicType;
 use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
+use group::{Group, GroupHandle};
 use lyon::{math::point, path::Path};
 use motion::{EmbededScene, FadeIn, Motion, Move};
 use object::{FillMaterial, Material, Model, Object, ObjectId, StrokeMaterial, Transform};
 use renderer::Renderer;
 use scene::{Scene, SceneBuilder};
-use shapes::{Circle, Line};
+use shapes::{Circle, Line, LineHandle};
 use spacing::Alignment;
 use std::collections::HashMap;
 use timing::{Concurrently, Sequence, Wait};
@@ -390,6 +391,8 @@ struct Grid {
 
 struct GridHandle {
     grid: ObjectId,
+    horizontal_lines: GroupHandle<Line>,
+    vertical_lines: GroupHandle<Line>,
 }
 
 impl Handle for GridHandle {
@@ -399,56 +402,55 @@ impl Handle for GridHandle {
 }
 
 impl Component for Grid {
-    type Handle = ObjectId;
+    type Handle = GridHandle;
 
-    fn build<B: Builder>(self, builder: &mut B) -> ObjectId {
-        let mut c = Concurrently::default();
+    fn build<B: Builder>(self, builder: &mut B) -> GridHandle {
+        let mut horizontal_lines = Group::new();
+        let mut vertical_lines = Group::new();
 
-        let grid = builder.group(|group| {
-            group.group(|group| {
-                for i in 0..=self.rows {
-                    let x = -self.width / 2.0;
-                    let y = (i as f32 / self.rows as f32) * self.height - self.height / 2.0;
+        for i in 0..=self.rows {
+            let x = -self.width / 2.0;
+            let y = (i as f32 / self.rows as f32) * self.height - self.height / 2.0;
 
-                    let line = group.add(Line {
-                        start: pos2(x, y),
-                        end: pos2(x, y),
-                        material: self.material.clone(),
-                    });
-
-                    c.add(
-                        Wait.with_duration(0.1 * i as f32).then(
-                            line.animate(pos2(x + self.width, y), pos2(x, y))
-                                .with_duration(1.0),
-                        ),
-                    );
-                }
+            horizontal_lines.add(Line {
+                start: pos2(x, y),
+                end: pos2(x + self.width, y),
+                material: self.material.clone(),
             });
 
-            group.group(|group| {
-                for i in 0..=self.cols {
-                    let x = (i as f32 / self.cols as f32) * self.width - self.width / 2.0;
-                    let y = -self.height / 2.0;
+            // c.add(
+            //     Wait.with_duration(0.1 * i as f32).then(
+            //         line.animate(pos2(x + self.width, y), pos2(x, y))
+            //             .with_duration(1.0),
+            //     ),
+            // );
+        }
 
-                    let line = group.add(Line {
-                        start: pos2(x, y),
-                        end: pos2(x, y),
-                        material: self.material.clone(),
-                    });
+        for i in 0..=self.cols {
+            let x = (i as f32 / self.cols as f32) * self.width - self.width / 2.0;
+            let y = -self.height / 2.0;
 
-                    c.add(
-                        Wait.with_duration(0.1 * i as f32).then(
-                            line.animate(pos2(x, y), pos2(x, y + self.height))
-                                .with_duration(1.0),
-                        ),
-                    );
-                }
+            vertical_lines.add(Line {
+                start: pos2(x, y),
+                end: pos2(x, y + self.height),
+                material: self.material.clone(),
             });
-        });
 
-        builder.play(c);
+            // c.add(
+            //     Wait.with_duration(0.1 * i as f32).then(
+            //         line.animate(pos2(x, y), pos2(x, y + self.height))
+            //             .with_duration(1.0),
+            //     ),
+            // );
+        }
 
-        grid
+        let grid = builder.add(Group::from_children(vec![horizontal_lines, vertical_lines]));
+
+        GridHandle {
+            grid: grid.id(),
+            horizontal_lines: grid.children.get(0).unwrap().clone(),
+            vertical_lines: grid.children.get(1).unwrap().clone(),
+        }
     }
 }
 
@@ -471,10 +473,12 @@ fn render_grid() -> Scene {
 fn typst_example() -> Scene {
     let mut b = SceneBuilder::new();
 
+    // b.add(Typst {
+    //     text: r#"$e^(i pi)+1=0$"#.to_string(),
+    //     material: FillMaterial::new(Color32::RED).into(),
+    // });
     b.add(Typst {
-        text: r#"
-#rect(width: 35%, height: 30pt)"#
-            .to_string(),
+        text: r#""area" = pi dot "radius"^2"#.to_string(),
         material: FillMaterial::new(Color32::RED).into(),
     });
 

@@ -8,5 +8,13 @@
  - [x] Root motions should not be in builder state 
    - [x] Actually should probably refactor the whole thing
  - [ ] Move everything to cgmath instead of using bits of egui
- - [ ] MoveTo -> MoveTo Hard to do because of the way the builder pattern works
- - [ ] Maybe motions should be called commands?
+ - [ ] MoveTo -> MoveTo: just calcuate the "from" position in the motion
+ - [ ] Maybe motions should be called `Command`s?
+ - [ ] Should components just be Into<Object> (should they be allowed to play
+       animations).
+ - [ ] Custom typst renderer with no svg needed, check the SVG renderer as 
+       a reference
+ - [ ] `BuilderExt` and `HandlerExt`
+ - [ ] `Builder` should really only have `.play` and `.add`/`.build` methods
+ - [ ] `Interpolatable` trait?
+ - [ ] Figure out the error handling story for motions and components

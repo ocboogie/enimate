@@ -39,6 +39,7 @@ pub struct Line {
     pub material: Material,
 }
 
+#[derive(Clone)]
 pub struct LineHandle {
     object_id: ObjectId,
     starting_start: Pos2,
