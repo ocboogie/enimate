@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use egui::Pos2;
 
 use crate::builder::Builder;
@@ -5,18 +7,30 @@ use crate::dynamics::{Dynamic, DynamicType};
 use crate::motion::MoveTo;
 use crate::object::{Object, ObjectId};
 
-pub trait Handle {
-    fn id(&self) -> ObjectId;
+pub struct Handle<T> {
+    pub inner: T,
+    pub object_id: ObjectId,
 }
 
-impl Handle for ObjectId {
-    fn id(&self) -> ObjectId {
-        *self
+impl<T> Deref for Handle<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: Clone> Clone for Handle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            object_id: self.object_id,
+        }
     }
 }
 
 pub trait Component {
-    type Handle: Handle;
+    type Handle;
 
     fn build<B: Builder>(self, builder: &mut B) -> Self::Handle;
 }
@@ -25,17 +39,15 @@ impl Component for Object {
     type Handle = ObjectId;
 
     fn build<B: Builder>(self, builder: &mut B) -> Self::Handle {
-        builder.add_new_object(self)
+        builder.add_object(self)
     }
 }
 
-pub trait HandleExt: Handle {
-    fn move_to(&self, pos: Dynamic<Pos2>) -> MoveTo {
+impl<T> Handle<T> {
+    pub fn move_to(&self, pos: Dynamic<Pos2>) -> MoveTo {
         MoveTo {
             to: pos,
-            object_id: self.id(),
+            object_id: self.object_id,
         }
     }
 }
-
-impl<T: Handle> HandleExt for T {}

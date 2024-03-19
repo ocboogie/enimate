@@ -1,7 +1,8 @@
 use crate::{
     animation::Animation,
     builder::Builder,
-    motion::{Alpha, Motion},
+    motion::{AddObject, Alpha, Motion},
+    object::{Object, ObjectId},
     object_tree::ObjectTree,
     timing::{Sequence, Time},
     world::{Variable, World},
@@ -66,5 +67,17 @@ impl SceneBuilder {
 impl Builder for SceneBuilder {
     fn play<A: Animation + 'static>(&mut self, animation: A) {
         (self.scene.0).0.push(Box::new(animation));
+    }
+
+    fn add_object(&mut self, object: Object) -> ObjectId {
+        let object_id = rand::random::<ObjectId>();
+
+        self.play(AddObject {
+            object_id,
+            object,
+            rooted: true,
+        });
+
+        object_id
     }
 }

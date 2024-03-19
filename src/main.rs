@@ -1,6 +1,6 @@
 use animation::{Animation, MotionAnimation};
 use builder::Builder;
-use component::{Component, Handle, HandleExt};
+use component::{Component, Handle};
 use dynamics::DynamicType;
 use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
@@ -10,7 +10,7 @@ use motion::{EmbededScene, FadeIn, Motion, Move};
 use object::{FillMaterial, Material, Model, Object, ObjectId, StrokeMaterial, Transform};
 use renderer::Renderer;
 use scene::{Scene, SceneBuilder};
-use shapes::{Circle, Line, LineHandle};
+use shapes::{Circle, Line};
 use spacing::Alignment;
 use std::collections::HashMap;
 use timing::{Concurrently, Sequence, Wait};
@@ -251,7 +251,7 @@ fn animations() -> Scene {
         seq.add(Wait.with_duration(0.1 * i as f32));
         seq.add(MotionAnimation {
             duration: 0.3,
-            motion: FadeIn { object_id: circle },
+            motion: FadeIn { object_id: *circle },
             easing: Easing::Linear,
         });
         c.add(seq);
@@ -344,8 +344,8 @@ fn dynamic_alignment() -> Scene {
 
     c.add(
         Move {
-            object_id: right_circle,
-            from: Alignment::new(right_circle).center().d(),
+            object_id: *right_circle,
+            from: Alignment::new(*right_circle).center().d(),
             to: pos2(1.0, -1.0).d(),
         }
         .with_duration(1.0)
@@ -354,9 +354,9 @@ fn dynamic_alignment() -> Scene {
 
     c.add(
         Move {
-            object_id: left_circle,
-            from: Alignment::new(left_circle).center().d(),
-            to: Alignment::new(right_circle).left().d(),
+            object_id: *left_circle,
+            from: Alignment::new(*left_circle).center().d(),
+            to: Alignment::new(*right_circle).left().d(),
         }
         .with_duration(1.0)
         .with_easing(EaseInOut),
@@ -390,15 +390,8 @@ struct Grid {
 }
 
 struct GridHandle {
-    grid: ObjectId,
-    horizontal_lines: GroupHandle<Line>,
-    vertical_lines: GroupHandle<Line>,
-}
-
-impl Handle for GridHandle {
-    fn id(&self) -> ObjectId {
-        self.grid
-    }
+    horizontal_lines: Handle<GroupHandle<Line>>,
+    vertical_lines: Handle<GroupHandle<Line>>,
 }
 
 impl Component for Grid {
@@ -444,12 +437,9 @@ impl Component for Grid {
             // );
         }
 
-        let grid = builder.add(Group::from_children(vec![horizontal_lines, vertical_lines]));
-
         GridHandle {
-            grid: grid.id(),
-            horizontal_lines: grid.children.get(0).unwrap().clone(),
-            vertical_lines: grid.children.get(1).unwrap().clone(),
+            horizontal_lines: builder.add(horizontal_lines),
+            vertical_lines: builder.add(vertical_lines),
         }
     }
 }

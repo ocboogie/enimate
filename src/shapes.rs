@@ -29,7 +29,7 @@ impl Component for Circle {
         let object = Object::new_model(path_builder.build(), self.material)
             .with_transform(Transform::default().with_position(self.center));
 
-        builder.add_new_object(object)
+        builder.add_object(object)
     }
 }
 
@@ -57,19 +57,13 @@ impl Component for Line {
 
         let object = Object::new_model(path_builder.build(), self.material);
 
-        let object_id = builder.add_new_object(object);
+        let object_id = builder.add_object(object);
 
         LineHandle {
             object_id,
             starting_start: self.start,
             starting_end: self.end,
         }
-    }
-}
-
-impl Handle for LineHandle {
-    fn id(&self) -> ObjectId {
-        self.object_id
     }
 }
 

@@ -85,9 +85,9 @@ pub struct Typst {
 }
 
 impl Component for Typst {
-    type Handle = ObjectId;
+    type Handle = ();
 
-    fn build<B: Builder>(self, builder: &mut B) -> Self::Handle {
+    fn build<B: Builder>(self, builder: &mut B) -> () {
         let id = FileId::new(None, VirtualPath::new("main.typ"));
         let source = Source::new(id, self.text);
         let world = EnimateWorld(source);
@@ -136,12 +136,10 @@ impl Component for Typst {
             }
         }
 
-        builder
-            .add(group.with_transform(Transform {
-                position: pos2(offset.x / POINTS_PER_UNIT, offset.y / POINTS_PER_UNIT),
-                ..Default::default()
-            }))
-            .id()
+        builder.add(group.with_transform(Transform {
+            position: pos2(offset.x / POINTS_PER_UNIT, offset.y / POINTS_PER_UNIT),
+            ..Default::default()
+        }));
     }
 }
 

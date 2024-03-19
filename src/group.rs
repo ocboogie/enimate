@@ -1,7 +1,7 @@
 use crate::{
     builder::Builder,
     component::{Component, Handle},
-    object::{Object, ObjectId, Transform},
+    object::Transform,
 };
 
 pub struct Group<C: Component> {
@@ -36,22 +36,14 @@ impl<C: Component> Group<C> {
 }
 
 pub struct GroupHandle<C: Component> {
-    pub object_id: ObjectId,
-    pub children: Vec<C::Handle>,
+    pub children: Vec<Handle<C::Handle>>,
 }
 
-impl<H: Handle + Clone, C: Component<Handle = H>> Clone for GroupHandle<C> {
+impl<H: Clone, C: Component<Handle = H>> Clone for GroupHandle<C> {
     fn clone(&self) -> Self {
         Self {
-            object_id: self.object_id,
             children: self.children.clone(),
         }
-    }
-}
-
-impl<C: Component> Handle for GroupHandle<C> {
-    fn id(&self) -> ObjectId {
-        self.object_id
     }
 }
 
@@ -65,13 +57,6 @@ impl<C: Component> Component for Group<C> {
             .map(|object| builder.add(object))
             .collect();
 
-        let children_ids: Vec<_> = children.iter().map(|child| child.id()).collect();
-
-        let object_id = builder.add_new_object(Object::new_group(children_ids));
-
-        GroupHandle {
-            object_id,
-            children,
-        }
+        GroupHandle { children }
     }
 }
