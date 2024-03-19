@@ -9,7 +9,7 @@ pub trait Builder: Sized {
     fn play<A: Animation + 'static>(&mut self, animation: A);
     fn add_object(&mut self, object: Object) -> ObjectId;
 
-    fn add<C: Component>(&mut self, component: C) -> Handle<C::Handle> {
+    fn add<C: Component>(&mut self, component: C) -> Handle<C> {
         let mut component_builder = ComponentBuilder {
             builder: self,
             objects: Vec::new(),

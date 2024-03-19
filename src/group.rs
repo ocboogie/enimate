@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use crate::{
     builder::Builder,
     component::{Component, Handle},
@@ -36,7 +38,21 @@ impl<C: Component> Group<C> {
 }
 
 pub struct GroupHandle<C: Component> {
-    pub children: Vec<Handle<C::Handle>>,
+    pub children: Vec<Handle<C>>,
+}
+
+impl<C: Component> Deref for GroupHandle<C> {
+    type Target = [Handle<C>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.children
+    }
+}
+
+impl<C: Component> DerefMut for GroupHandle<C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.children
+    }
 }
 
 impl<H: Clone, C: Component<Handle = H>> Clone for GroupHandle<C> {

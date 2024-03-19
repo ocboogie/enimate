@@ -390,8 +390,9 @@ struct Grid {
 }
 
 struct GridHandle {
-    horizontal_lines: Handle<GroupHandle<Line>>,
-    vertical_lines: Handle<GroupHandle<Line>>,
+    grid: Grid,
+    horizontal_lines: Handle<Group<Line>>,
+    vertical_lines: Handle<Group<Line>>,
 }
 
 impl Component for Grid {
@@ -410,13 +411,6 @@ impl Component for Grid {
                 end: pos2(x + self.width, y),
                 material: self.material.clone(),
             });
-
-            // c.add(
-            //     Wait.with_duration(0.1 * i as f32).then(
-            //         line.animate(pos2(x + self.width, y), pos2(x, y))
-            //             .with_duration(1.0),
-            //     ),
-            // );
         }
 
         for i in 0..=self.cols {
@@ -438,6 +432,7 @@ impl Component for Grid {
         }
 
         GridHandle {
+            grid: self,
             horizontal_lines: builder.add(horizontal_lines),
             vertical_lines: builder.add(vertical_lines),
         }

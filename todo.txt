@@ -8,7 +8,7 @@
  - [x] Root motions should not be in builder state 
    - [x] Actually should probably refactor the whole thing
  - [ ] Move everything to cgmath instead of using bits of egui
- - [ ] MoveTo -> MoveTo: just calcuate the "from" position in the motion
+ - [x] MoveTo -> MoveTo: just calcuate the "from" position in the motion
  - [ ] Maybe motions should be called `Command`s?
  - [ ] Should components just be Into<Object> (should they be allowed to play
        animations).
@@ -18,3 +18,5 @@
  - [ ] `Builder` should really only have `.play` and `.add`/`.build` methods
  - [ ] `Interpolatable` trait?
  - [ ] Figure out the error handling story for motions and components
+ - [ ] Collect `Component`s into group
+ - [ ] `Property<T, Updater>` struct that can be used to 

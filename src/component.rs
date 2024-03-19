@@ -7,20 +7,20 @@ use crate::dynamics::{Dynamic, DynamicType};
 use crate::motion::MoveTo;
 use crate::object::{Object, ObjectId};
 
-pub struct Handle<T> {
-    pub inner: T,
+pub struct Handle<C: Component> {
+    pub inner: C::Handle,
     pub object_id: ObjectId,
 }
 
-impl<T> Deref for Handle<T> {
-    type Target = T;
+impl<C: Component> Deref for Handle<C> {
+    type Target = C::Handle;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<T: Clone> Clone for Handle<T> {
+impl<H: Clone, C: Component<Handle = H>> Clone for Handle<C> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -43,7 +43,7 @@ impl Component for Object {
     }
 }
 
-impl<T> Handle<T> {
+impl<C: Component> Handle<C> {
     pub fn move_to(&self, pos: Dynamic<Pos2>) -> MoveTo {
         MoveTo {
             to: pos,
