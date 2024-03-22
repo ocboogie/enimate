@@ -3,15 +3,15 @@ use std::collections::HashMap;
 
 pub type Variable = usize;
 
-pub struct World<'a> {
-    pub objects: &'a mut ObjectTree,
+pub struct World {
+    pub objects: ObjectTree,
     render_size: (f32, f32),
     variables: HashMap<Variable, f32>,
 }
 
-impl<'a> World<'a> {
+impl World {
     pub fn new(
-        objects: &'a mut ObjectTree,
+        objects: ObjectTree,
         render_size: (f32, f32),
         variables: HashMap<Variable, f32>,
     ) -> Self {

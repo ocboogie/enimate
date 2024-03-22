@@ -1,5 +1,5 @@
 use crate::animation::{Animation, MotionAnimation};
-use crate::dynamics::{Dynamic, DynamicTransform, DynamicType};
+use crate::dynamics::{Dynamic, DynamicObject, DynamicTransform, DynamicType};
 use crate::easing::Easing;
 use crate::object::{Object, ObjectId, ObjectKind};
 use crate::scene::Scene;
@@ -84,15 +84,14 @@ impl Animation for EmbededScene {
 
 pub struct AddObject {
     pub object_id: usize,
-    pub object: Object,
+    pub object: DynamicObject,
     pub rooted: bool,
 }
 
 impl Trigger for AddObject {
     fn trigger(&self, world: &mut World) {
-        world
-            .objects
-            .add(self.object_id, self.object.clone(), self.rooted);
+        let object = self.object.get(world);
+        world.objects.add(self.object_id, object, self.rooted);
     }
 }
 

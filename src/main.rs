@@ -22,12 +22,10 @@ mod component;
 mod dynamics;
 mod easing;
 mod group;
-mod interpolation;
 mod mesh;
 mod motion;
 mod object;
 mod object_tree;
-mod properties;
 mod renderer;
 mod scene;
 mod shapes;
@@ -255,7 +253,9 @@ fn animations() -> Scene {
         seq.add(Wait.with_duration(0.1 * i as f32));
         seq.add(MotionAnimation {
             duration: 0.3,
-            motion: FadeIn { object_id: *circle },
+            motion: FadeIn {
+                object_id: **circle,
+            },
             easing: Easing::Linear,
         });
         c.add(seq);
@@ -283,17 +283,13 @@ fn movement() -> Scene {
 
     c.add(
         circle_a
-            .transform
-            .position()
-            .animate_from(pos2(-1.0, 2.0).d(), pos2(1.0, 2.0).d())
+            .mv(pos2(-1.0, 2.0).d(), pos2(1.0, 2.0).d())
             .with_duration(1.0)
             .with_easing(Easing::EaseInOut),
     );
     c.add(
         circle_b
-            .transform
-            .position()
-            .animate_from(pos2(-1.0, -2.0).d(), pos2(1.0, -2.0).d())
+            .mv(pos2(-1.0, -2.0).d(), pos2(1.0, -2.0).d())
             .with_duration(1.0)
             .with_easing(Easing::Linear),
     );
@@ -354,8 +350,8 @@ fn dynamic_alignment() -> Scene {
 
     c.add(
         Move {
-            object_id: *right_circle,
-            from: Alignment::new(*right_circle).center().d(),
+            object_id: **right_circle,
+            from: Alignment::new(**right_circle).center().d(),
             to: pos2(1.0, -1.0).d(),
         }
         .with_duration(1.0)
@@ -364,9 +360,9 @@ fn dynamic_alignment() -> Scene {
 
     c.add(
         Move {
-            object_id: *left_circle,
-            from: Alignment::new(*left_circle).center().d(),
-            to: Alignment::new(*right_circle).left().d(),
+            object_id: **left_circle,
+            from: Alignment::new(**left_circle).center().d(),
+            to: Alignment::new(**right_circle).left().d(),
         }
         .with_duration(1.0)
         .with_easing(EaseInOut),
@@ -454,17 +450,12 @@ fn render_grid() -> Scene {
 
     for y in 0..=8 {
         for x in 0..16 {
-            let circle = b
-                .add(Circle {
+            let circle = b.add(
+                Circle {
                     radius: 0.1,
                     material: FillMaterial::new(Color32::RED).into(),
-                })
-                .with_posotion(pos2(x as f32 - 8.0, y as f32 - 4.0));
-            b.play(
-                circle
-                    .transform
-                    .position()
-                    .set(pos2(x as f32 - 8.0, y as f32 - 4.0).d()),
+                }
+                .with_position(pos2(x as f32 - 8.0, y as f32 - 4.0)),
             );
         }
     }

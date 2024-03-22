@@ -1,11 +1,12 @@
+use dyn_clone::DynClone;
 use egui::Pos2;
 
 use crate::{
-    object::Transform,
+    object::{Object, ObjectId, ObjectKind, Transform},
     world::{Variable, World},
 };
 
-pub trait DynamicType<T> {
+pub trait DynamicType<T>: DynClone {
     fn get(&self, world: &World) -> T;
 
     fn d(self) -> Dynamic<T>
@@ -17,6 +18,18 @@ pub trait DynamicType<T> {
 }
 
 pub struct Dynamic<T>(Box<dyn DynamicType<T>>);
+
+impl<T> Dynamic<T> {
+    pub fn new(dynamic: impl DynamicType<T> + 'static) -> Self {
+        Self(Box::new(dynamic))
+    }
+}
+
+impl<T> Clone for Dynamic<T> {
+    fn clone(&self) -> Self {
+        Dynamic(dyn_clone::clone_box(&*self.0))
+    }
+}
 
 impl<T> DynamicType<T> for Dynamic<T> {
     fn get(&self, world: &World) -> T {
@@ -75,6 +88,7 @@ impl DynamicType<Pos2> for Pos2 {
     }
 }
 
+#[derive(Clone)]
 pub struct DynamicTransform {
     pub position: Dynamic<Pos2>,
     pub scale: Dynamic<f32>,
@@ -107,5 +121,43 @@ impl From<Transform> for DynamicTransform {
             rotation: transform.rotation.d(),
             anchor: transform.anchor.d(),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct DynamicObject {
+    object_kind: ObjectKind,
+    transform: DynamicTransform,
+}
+
+impl DynamicType<Object> for DynamicObject {
+    fn get(&self, world: &World) -> Object {
+        Object {
+            object_kind: self.object_kind.clone(),
+            transform: self.transform.get(world),
+        }
+    }
+}
+
+impl From<Object> for DynamicObject {
+    fn from(object: Object) -> Self {
+        Self {
+            object_kind: object.object_kind,
+            transform: object.transform.into(),
+        }
+    }
+}
+
+impl DynamicObject {
+    pub fn new_group(objects: Vec<ObjectId>) -> Self {
+        Self {
+            object_kind: ObjectKind::Group(objects),
+            transform: Transform::default().into(),
+        }
+    }
+
+    pub fn with_transform(mut self, transform: impl Into<DynamicTransform>) -> Self {
+        self.transform = transform.into();
+        self
     }
 }

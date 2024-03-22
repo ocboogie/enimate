@@ -1,6 +1,7 @@
 use crate::{
     animation::Animation,
     builder::Builder,
+    dynamics::DynamicObject,
     motion::{AddObject, Alpha, Motion},
     object::{Object, ObjectId},
     object_tree::ObjectTree,
@@ -25,12 +26,11 @@ impl Scene {
     }
 
     pub fn render_at(&self, time: Time, render_size: (f32, f32)) -> ObjectTree {
-        let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, render_size, HashMap::new());
+        let mut world = World::new(ObjectTree::new(), render_size, HashMap::new());
 
         self.0.animate(&mut world, self.time_to_alpha(time));
 
-        objects
+        world.objects
     }
 
     pub fn render_with_input(
@@ -39,12 +39,11 @@ impl Scene {
         render_size: (f32, f32),
         input: HashMap<Variable, f32>,
     ) -> ObjectTree {
-        let mut objects = ObjectTree::new();
-        let mut world = World::new(&mut objects, render_size, input);
+        let mut world = World::new(ObjectTree::new(), render_size, input);
 
         self.0.animate(&mut world, self.time_to_alpha(time));
 
-        objects
+        world.objects
     }
 }
 
@@ -69,7 +68,7 @@ impl Builder for SceneBuilder {
         (self.scene.0).0.push(Box::new(animation));
     }
 
-    fn add_object(&mut self, object: Object) -> ObjectId {
+    fn add_object(&mut self, object: DynamicObject) -> ObjectId {
         let object_id = rand::random::<ObjectId>();
 
         self.play(AddObject {

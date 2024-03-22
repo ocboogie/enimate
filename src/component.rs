@@ -3,14 +3,12 @@ use std::ops::Deref;
 use egui::Pos2;
 
 use crate::builder::Builder;
-use crate::dynamics::Dynamic;
-use crate::motion::MoveTo;
+use crate::dynamics::{Dynamic, DynamicTransform};
+use crate::motion::{Move, MoveTo};
 use crate::object::{Object, ObjectId, Transform};
-use crate::properties::TransformProperty;
 
 pub struct Handle<C: Component> {
     pub inner: C::Handle,
-    pub transform: TransformProperty,
     pub object_id: ObjectId,
 }
 
@@ -26,7 +24,6 @@ impl<H: Clone, C: Component<Handle = H>> Clone for Handle<C> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            transform: self.transform.clone(),
             object_id: self.object_id,
         }
     }
@@ -37,72 +34,71 @@ pub trait Component {
 
     fn build<B: Builder>(self, builder: &mut B) -> Self::Handle;
 
-    fn transform(&self) -> Transform {
-        Transform::default()
+    fn transform(&self) -> DynamicTransform {
+        Transform::default().into()
     }
 }
 
 pub trait ComponentExt: Component + Sized {
-    fn with_transform(self, transform: Transform) -> ComponentWrapper<Self> {
-        ComponentWrapper {
+    fn with_transform(
+        self,
+        transform: impl Into<DynamicTransform>,
+    ) -> ComponentWithTransform<Self> {
+        ComponentWithTransform {
             component: self,
-            transform,
+            transform: transform.into(),
         }
     }
-    fn with_position(self, position: Pos2) -> ComponentWrapper<Self> {
+    fn with_position(self, position: Pos2) -> ComponentWithTransform<Self> {
         self.with_transform(Transform::default().with_position(position))
     }
-    fn with_rotation(self, rotation: f32) -> ComponentWrapper<Self> {
+    fn with_rotation(self, rotation: f32) -> ComponentWithTransform<Self> {
         self.with_transform(Transform::default().with_rotation(rotation))
     }
-    fn with_scale(self, scale: f32) -> ComponentWrapper<Self> {
+    fn with_scale(self, scale: f32) -> ComponentWithTransform<Self> {
         self.with_transform(Transform::default().with_scale(scale))
     }
-    fn with_anchor(self, anchor: Pos2) -> ComponentWrapper<Self> {
+    fn with_anchor(self, anchor: Pos2) -> ComponentWithTransform<Self> {
         self.with_transform(Transform::default().with_anchor(anchor))
     }
 }
 
 impl<C: Component> ComponentExt for C {}
 
-pub struct ComponentWrapper<C: Component> {
+pub struct ComponentWithTransform<C: Component> {
     component: C,
-    transform: Transform,
+    transform: DynamicTransform,
 }
 
-impl<C: Component> Component for ComponentWrapper<C> {
+impl<C: Component> Component for ComponentWithTransform<C> {
     type Handle = C::Handle;
 
     fn build<B: Builder>(self, builder: &mut B) -> Self::Handle {
         self.component.build(builder)
     }
 
-    fn transform(&self) -> Transform {
-        self.transform
+    fn transform(&self) -> DynamicTransform {
+        self.transform.clone()
     }
 }
 
-impl<C: Component> ComponentWrapper<C> {
-    pub fn with_transform(mut self, transform: Transform) -> Self {
-        self.transform = transform;
+impl<C: Component> ComponentWithTransform<C> {
+    pub fn with_transform(mut self, transform: impl Into<DynamicTransform>) -> Self {
+        self.transform = transform.into();
         self
     }
-    pub fn with_position(mut self, position: Pos2) -> Self {
-        self.transform.position = position;
+    pub fn with_position(mut self, position: impl Into<Dynamic<Pos2>>) -> Self {
+        self.transform.position = position.into();
         self
     }
-    pub fn with_rotation(mut self, rotation: f32) -> Self {
-        self.transform.rotation = rotation;
+    pub fn with_rotation(mut self, rotation: impl Into<Dynamic<f32>>) -> Self {
+        self.transform.rotation = rotation.into();
         self
     }
-    pub fn with_scale(mut self, scale: f32) -> Self {
-        self.transform.scale = scale;
+    pub fn with_scale(mut self, scale: impl Into<Dynamic<f32>>) -> Self {
+        self.transform.scale = scale.into();
         self
     }
-}
-
-pub struct ObjectHandler {
-    transform: TransformProperty,
 }
 
 impl<C: Component> Handle<C> {
@@ -112,12 +108,20 @@ impl<C: Component> Handle<C> {
             object_id: self.object_id,
         }
     }
+
+    pub fn mv(&self, from: Dynamic<Pos2>, to: Dynamic<Pos2>) -> Move {
+        Move {
+            from,
+            to,
+            object_id: self.object_id,
+        }
+    }
 }
 
 impl Component for Object {
     type Handle = ObjectId;
 
     fn build<B: Builder>(self, builder: &mut B) -> Self::Handle {
-        builder.add_object(self)
+        builder.add_object(self.into())
     }
 }

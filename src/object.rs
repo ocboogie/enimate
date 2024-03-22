@@ -1,6 +1,8 @@
 use egui::{pos2, Color32, Pos2, Rect};
 use lyon::path::Path;
 
+use crate::dynamics::{Dynamic, DynamicType};
+
 #[derive(Clone, Debug)]
 pub struct FillMaterial {
     pub color: Color32,

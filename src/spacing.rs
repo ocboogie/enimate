@@ -1,6 +1,7 @@
 use crate::{dynamics::DynamicType, object::ObjectId, renderer::UNIT_GRID_HEIGHT, world::World};
 use egui::Pos2;
 
+#[derive(Clone)]
 pub struct Pixels(f32);
 
 impl DynamicType<f32> for Pixels {
@@ -9,18 +10,21 @@ impl DynamicType<f32> for Pixels {
     }
 }
 
+#[derive(Clone)]
 pub enum HorizontalAlignment {
     Left,
     Center,
     Right,
 }
 
+#[derive(Clone)]
 pub enum VerticalAlignment {
     Top,
     Center,
     Bottom,
 }
 
+#[derive(Clone)]
 pub struct Alignment {
     target: ObjectId,
     horizontal: HorizontalAlignment,

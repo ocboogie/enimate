@@ -9,7 +9,6 @@ use crate::{
     component::{Component, Handle},
     motion::Motion,
     object::{Material, Object, ObjectId, ObjectKind, Transform},
-    properties::Property,
     world::World,
 };
 
@@ -19,11 +18,11 @@ pub struct Circle {
 }
 
 pub struct CircleHandle {
-    radius: Property<f32>,
+    radius: f32,
 }
 
 impl Component for Circle {
-    type Handle = ObjectId;
+    type Handle = Handle<Object>;
 
     fn build<B: Builder>(self, builder: &mut B) -> Self::Handle {
         let mut path_builder = Path::builder();
@@ -31,7 +30,7 @@ impl Component for Circle {
 
         let object = Object::new_model(path_builder.build(), self.material);
 
-        builder.add_object(object)
+        builder.add(object)
     }
 }
 
@@ -66,7 +65,7 @@ impl Component for Line {
 
         let object = Object::new_model(path, self.material);
 
-        let object_id = builder.add_object(object);
+        let object_id = builder.add(object);
 
         LineHandle {
             start: self.start,
