@@ -199,6 +199,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ("Render Grid", render_grid()),
                     ("Grid", grid()),
                     ("Typst", typst_example()),
+                    ("Dynamic path", dynamic_line()),
                 ],
             ))
         }),
@@ -474,6 +475,23 @@ fn typst_example() -> Scene {
         text: r#""area" = pi dot "radius"^2"#.to_string(),
         material: FillMaterial::new(Color32::RED).into(),
     });
+
+    b.finish()
+}
+
+fn dynamic_line() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let line = b.add(Line {
+        start: pos2(-1.0, 0.0),
+        end: pos2(1.0, 0.0),
+        material: StrokeMaterial::new(Color32::RED, 0.1).into(),
+    });
+
+    b.play(
+        line.animate(Some(pos2(-1.0, 1.0)), Some(pos2(1.0, -1.0)))
+            .with_duration(1.0),
+    );
 
     b.finish()
 }

@@ -42,6 +42,7 @@ pub struct Line {
 
 #[derive(Clone)]
 pub struct LineHandle {
+    line: Handle<Object>,
     start: Pos2,
     end: Pos2,
 }
@@ -65,9 +66,8 @@ impl Component for Line {
 
         let object = Object::new_model(path, self.material);
 
-        let object_id = builder.add(object);
-
         LineHandle {
+            line: builder.add(object),
             start: self.start,
             end: self.end,
         }
@@ -77,7 +77,7 @@ impl Component for Line {
 impl Handle<Line> {
     pub fn animate(&self, start: Option<Pos2>, end: Option<Pos2>) -> impl Motion {
         struct LineAnimation {
-            object_id: ObjectId,
+            object_id: Handle<Object>,
             from_start: Pos2,
             from_end: Pos2,
             to_start: Option<Pos2>,
@@ -104,7 +104,7 @@ impl Handle<Line> {
         }
 
         LineAnimation {
-            object_id: self.object_id,
+            object_id: self.line.clone(),
             from_start: self.start,
             from_end: self.end,
             to_start: start,
