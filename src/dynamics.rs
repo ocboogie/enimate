@@ -1,4 +1,4 @@
-use dyn_clone::DynClone;
+use dyn_clone::{clone_box, DynClone};
 use egui::Pos2;
 
 use crate::{
@@ -6,38 +6,35 @@ use crate::{
     world::{Variable, World},
 };
 
-pub trait DynamicType<T>: DynClone {
+pub trait Dynamic<T: 'static>: DynClone + 'static {
     fn get(&self, world: &World) -> T;
-
-    fn d(self) -> Dynamic<T>
-    where
-        Self: Sized + 'static,
-    {
-        Dynamic(Box::new(self))
-    }
 }
 
-pub struct Dynamic<T>(Box<dyn DynamicType<T>>);
+pub struct OwnedDynamic<T: 'static>(Box<dyn Dynamic<T>>);
 
-impl<T> Dynamic<T> {
-    pub fn new(dynamic: impl DynamicType<T> + 'static) -> Self {
-        Self(Box::new(dynamic))
+impl<T: 'static> OwnedDynamic<T> {
+    pub fn new(dynamic: impl Dynamic<T>) -> Self {
+        OwnedDynamic(Box::new(dynamic))
     }
-}
 
-impl<T> Clone for Dynamic<T> {
-    fn clone(&self) -> Self {
-        Dynamic(dyn_clone::clone_box(&*self.0))
-    }
-}
-
-impl<T> DynamicType<T> for Dynamic<T> {
-    fn get(&self, world: &World) -> T {
+    pub fn get(&self, world: &World) -> T {
         self.0.get(world)
     }
 }
 
-impl DynamicType<f32> for Variable {
+impl<T: 'static> Clone for OwnedDynamic<T> {
+    fn clone(&self) -> Self {
+        Self(clone_box(&*self.0))
+    }
+}
+
+// impl<T> DynamicType<T> for Dynamic<T> {
+//     fn get(&self, world: &World) -> T {
+//         self.0.get(world)
+//     }
+// }
+
+impl Dynamic<f32> for Variable {
     fn get(&self, world: &World) -> f32 {
         world.get_variable(*self)
     }
@@ -70,19 +67,13 @@ impl DynamicType<f32> for Variable {
 //     }
 // }
 
-impl DynamicType<f32> for f32 {
+impl Dynamic<f32> for f32 {
     fn get(&self, _: &World) -> f32 {
         *self
     }
 }
 
-impl DynamicType<Pos2> for (Dynamic<f32>, Dynamic<f32>) {
-    fn get(&self, world: &World) -> Pos2 {
-        Pos2::new(self.0.get(world), self.1.get(world))
-    }
-}
-
-impl DynamicType<Pos2> for Pos2 {
+impl Dynamic<Pos2> for Pos2 {
     fn get(&self, _: &World) -> Pos2 {
         *self
     }
@@ -90,13 +81,13 @@ impl DynamicType<Pos2> for Pos2 {
 
 #[derive(Clone)]
 pub struct DynamicTransform {
-    pub position: Dynamic<Pos2>,
-    pub scale: Dynamic<f32>,
-    pub rotation: Dynamic<f32>,
-    pub anchor: Dynamic<Pos2>,
+    pub position: OwnedDynamic<Pos2>,
+    pub scale: OwnedDynamic<f32>,
+    pub rotation: OwnedDynamic<f32>,
+    pub anchor: OwnedDynamic<Pos2>,
 }
 
-impl DynamicType<Transform> for DynamicTransform {
+impl Dynamic<Transform> for DynamicTransform {
     fn get(&self, world: &World) -> Transform {
         Transform {
             position: self.position.get(world),
@@ -107,7 +98,7 @@ impl DynamicType<Transform> for DynamicTransform {
     }
 }
 
-impl DynamicType<Transform> for Transform {
+impl Dynamic<Transform> for Transform {
     fn get(&self, _: &World) -> Transform {
         *self
     }
@@ -116,10 +107,10 @@ impl DynamicType<Transform> for Transform {
 impl From<Transform> for DynamicTransform {
     fn from(transform: Transform) -> Self {
         Self {
-            position: transform.position.d(),
-            scale: transform.scale.d(),
-            rotation: transform.rotation.d(),
-            anchor: transform.anchor.d(),
+            position: OwnedDynamic::new(transform.position),
+            scale: OwnedDynamic::new(transform.scale),
+            rotation: OwnedDynamic::new(transform.rotation),
+            anchor: OwnedDynamic::new(transform.anchor),
         }
     }
 }
@@ -127,10 +118,10 @@ impl From<Transform> for DynamicTransform {
 #[derive(Clone)]
 pub struct DynamicObject {
     object_kind: ObjectKind,
-    transform: DynamicTransform,
+    transform: OwnedDynamic<Transform>,
 }
 
-impl DynamicType<Object> for DynamicObject {
+impl Dynamic<Object> for DynamicObject {
     fn get(&self, world: &World) -> Object {
         Object {
             object_kind: self.object_kind.clone(),
@@ -143,7 +134,7 @@ impl From<Object> for DynamicObject {
     fn from(object: Object) -> Self {
         Self {
             object_kind: object.object_kind,
-            transform: object.transform.into(),
+            transform: OwnedDynamic::new(object.transform),
         }
     }
 }
@@ -152,12 +143,12 @@ impl DynamicObject {
     pub fn new_group(objects: Vec<ObjectId>) -> Self {
         Self {
             object_kind: ObjectKind::Group(objects),
-            transform: Transform::default().into(),
+            transform: OwnedDynamic::new(Transform::default()),
         }
     }
 
-    pub fn with_transform(mut self, transform: impl Into<DynamicTransform>) -> Self {
-        self.transform = transform.into();
+    pub fn with_transform(mut self, transform: impl Dynamic<Transform>) -> Self {
+        self.transform = OwnedDynamic::new(transform);
         self
     }
 }

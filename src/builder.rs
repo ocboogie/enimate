@@ -1,7 +1,7 @@
 use crate::{
     animation::Animation,
     component::{Component, Handle},
-    dynamics::DynamicObject,
+    dynamics::{DynamicObject, OwnedDynamic},
     motion::AddObject,
     object::{Object, ObjectId},
 };
@@ -47,7 +47,7 @@ impl<'a, B: Builder> Builder for ComponentBuilder<'a, B> {
         self.objects.push(object_id);
         self.play(AddObject {
             object_id,
-            object,
+            object: OwnedDynamic::new(object),
             rooted: false,
         });
         object_id

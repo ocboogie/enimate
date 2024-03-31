@@ -1,7 +1,7 @@
 use crate::animation::{Animation, MotionAnimation};
-use crate::dynamics::{Dynamic, DynamicObject, DynamicTransform, DynamicType};
+use crate::dynamics::{DynamicObject, DynamicTransform, OwnedDynamic};
 use crate::easing::Easing;
-use crate::object::{Object, ObjectId, ObjectKind};
+use crate::object::{Object, ObjectId, ObjectKind, Transform};
 use crate::scene::Scene;
 use crate::trigger::Trigger;
 use crate::world::World;
@@ -42,7 +42,7 @@ impl Motion for Box<dyn Motion> {
 
 pub struct EmbededScene {
     pub scene: Scene,
-    pub transform: DynamicTransform,
+    pub transform: OwnedDynamic<Transform>,
     pub speed: f32,
     pub object_id: ObjectId,
     pub rooted: bool,
@@ -84,7 +84,7 @@ impl Animation for EmbededScene {
 
 pub struct AddObject {
     pub object_id: usize,
-    pub object: DynamicObject,
+    pub object: OwnedDynamic<Object>,
     pub rooted: bool,
 }
 
@@ -96,8 +96,8 @@ impl Trigger for AddObject {
 }
 
 pub struct Move {
-    pub from: Dynamic<Pos2>,
-    pub to: Dynamic<Pos2>,
+    pub from: OwnedDynamic<Pos2>,
+    pub to: OwnedDynamic<Pos2>,
     pub object_id: usize,
 }
 
@@ -118,7 +118,7 @@ impl Motion for Move {
 }
 
 pub struct MoveTo {
-    pub to: Dynamic<Pos2>,
+    pub to: OwnedDynamic<Pos2>,
     pub object_id: usize,
 }
 
@@ -132,12 +132,14 @@ impl Motion for MoveTo {
             .transform
             .position;
 
-        Move {
-            from: from.d(),
-            to: to.d(),
-            object_id: self.object_id,
-        }
-        .animate(world, alpha);
+        let pos = from + (to - from) * alpha;
+
+        world
+            .objects
+            .get_mut(&self.object_id)
+            .unwrap()
+            .transform
+            .position = pos;
     }
 }
 

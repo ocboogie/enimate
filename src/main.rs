@@ -1,7 +1,7 @@
 use animation::{Animation, MotionAnimation};
 use builder::Builder;
 use component::{Component, ComponentExt, Handle};
-use dynamics::DynamicType;
+use dynamics::{Dynamic, OwnedDynamic};
 use easing::Easing::{self, EaseInOut};
 use egui::{pos2, Color32, Pos2, Stroke};
 use group::{Group, GroupHandle};
@@ -284,13 +284,13 @@ fn movement() -> Scene {
 
     c.add(
         circle_a
-            .mv(pos2(-1.0, 2.0).d(), pos2(1.0, 2.0).d())
+            .mv(pos2(-1.0, 2.0), pos2(1.0, 2.0))
             .with_duration(1.0)
             .with_easing(Easing::EaseInOut),
     );
     c.add(
         circle_b
-            .mv(pos2(-1.0, -2.0).d(), pos2(1.0, -2.0).d())
+            .mv(pos2(-1.0, -2.0), pos2(1.0, -2.0))
             .with_duration(1.0)
             .with_easing(Easing::Linear),
     );
@@ -305,20 +305,22 @@ pub fn embedded_scenes() -> Scene {
     let mut c = Concurrently::default();
     c.add(EmbededScene {
         scene: animations(),
-        transform: Transform::default()
-            .with_position(pos2(-2.0, 0.0))
-            .with_scale(0.5)
-            .into(),
+        transform: OwnedDynamic::new(
+            Transform::default()
+                .with_position(pos2(-2.0, 0.0))
+                .with_scale(0.5),
+        ),
         speed: 1.0,
         object_id: rand::random::<usize>(),
         rooted: true,
     });
     c.add(EmbededScene {
         scene: movement(),
-        transform: Transform::default()
-            .with_position(pos2(2.0, 0.0))
-            .with_scale(0.5)
-            .into(),
+        transform: OwnedDynamic::new(
+            Transform::default()
+                .with_position(pos2(2.0, 0.0))
+                .with_scale(0.5),
+        ),
         speed: 1.0,
         object_id: rand::random::<usize>(),
         rooted: true,
@@ -350,23 +352,20 @@ fn dynamic_alignment() -> Scene {
     let mut c = Concurrently::default();
 
     c.add(
-        Move {
-            object_id: **right_circle,
-            from: Alignment::new(**right_circle).center().d(),
-            to: pos2(1.0, -1.0).d(),
-        }
-        .with_duration(1.0)
-        .with_easing(EaseInOut),
+        right_circle
+            .mv(Alignment::new(**right_circle).center(), pos2(1.0, -1.0))
+            .with_duration(1.0)
+            .with_easing(EaseInOut),
     );
 
     c.add(
-        Move {
-            object_id: **left_circle,
-            from: Alignment::new(**left_circle).center().d(),
-            to: Alignment::new(**right_circle).left().d(),
-        }
-        .with_duration(1.0)
-        .with_easing(EaseInOut),
+        left_circle
+            .mv(
+                Alignment::new(**left_circle).center(),
+                Alignment::new(**right_circle).left(),
+            )
+            .with_duration(1.0)
+            .with_easing(EaseInOut),
     );
 
     b.play(c);

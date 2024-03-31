@@ -1,7 +1,7 @@
 use crate::{
     animation::Animation,
     builder::Builder,
-    dynamics::DynamicObject,
+    dynamics::{DynamicObject, OwnedDynamic},
     motion::{AddObject, Alpha, Motion},
     object::{Object, ObjectId},
     object_tree::ObjectTree,
@@ -73,7 +73,7 @@ impl Builder for SceneBuilder {
 
         self.play(AddObject {
             object_id,
-            object,
+            object: OwnedDynamic::new(object),
             rooted: true,
         });
 

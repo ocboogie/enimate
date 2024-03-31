@@ -3,7 +3,7 @@ use std::ops::Deref;
 use egui::Pos2;
 
 use crate::builder::Builder;
-use crate::dynamics::{Dynamic, DynamicTransform};
+use crate::dynamics::{Dynamic, DynamicTransform, OwnedDynamic};
 use crate::motion::{Move, MoveTo};
 use crate::object::{Object, ObjectId, Transform};
 
@@ -87,32 +87,32 @@ impl<C: Component> ComponentWithTransform<C> {
         self.transform = transform.into();
         self
     }
-    pub fn with_position(mut self, position: impl Into<Dynamic<Pos2>>) -> Self {
-        self.transform.position = position.into();
+    pub fn with_position(mut self, position: impl Dynamic<Pos2>) -> Self {
+        self.transform.position = OwnedDynamic::new(position);
         self
     }
-    pub fn with_rotation(mut self, rotation: impl Into<Dynamic<f32>>) -> Self {
-        self.transform.rotation = rotation.into();
+    pub fn with_rotation(mut self, rotation: impl Dynamic<f32>) -> Self {
+        self.transform.rotation = OwnedDynamic::new(rotation);
         self
     }
-    pub fn with_scale(mut self, scale: impl Into<Dynamic<f32>>) -> Self {
-        self.transform.scale = scale.into();
+    pub fn with_scale(mut self, scale: impl Dynamic<f32>) -> Self {
+        self.transform.scale = OwnedDynamic::new(scale);
         self
     }
 }
 
 impl<C: Component> Handle<C> {
-    pub fn move_to(&self, pos: Dynamic<Pos2>) -> MoveTo {
+    pub fn move_to(&self, pos: impl Dynamic<Pos2>) -> MoveTo {
         MoveTo {
-            to: pos,
+            to: OwnedDynamic::new(pos),
             object_id: self.object_id,
         }
     }
 
-    pub fn mv(&self, from: Dynamic<Pos2>, to: Dynamic<Pos2>) -> Move {
+    pub fn mv(&self, from: impl Dynamic<Pos2>, to: impl Dynamic<Pos2>) -> Move {
         Move {
-            from,
-            to,
+            from: OwnedDynamic::new(from),
+            to: OwnedDynamic::new(to),
             object_id: self.object_id,
         }
     }

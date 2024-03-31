@@ -1,10 +1,10 @@
-use crate::{dynamics::DynamicType, object::ObjectId, renderer::UNIT_GRID_HEIGHT, world::World};
+use crate::{dynamics::Dynamic, object::ObjectId, renderer::UNIT_GRID_HEIGHT, world::World};
 use egui::Pos2;
 
 #[derive(Clone)]
 pub struct Pixels(f32);
 
-impl DynamicType<f32> for Pixels {
+impl Dynamic<f32> for Pixels {
     fn get(&self, world: &World) -> f32 {
         self.0 * (world.render_size().1 / UNIT_GRID_HEIGHT)
     }
@@ -66,7 +66,7 @@ impl Alignment {
     }
 }
 
-impl DynamicType<Pos2> for Alignment {
+impl Dynamic<Pos2> for Alignment {
     fn get(&self, world: &World) -> Pos2 {
         let bb = world.objects.local_bounding_box(self.target);
 
