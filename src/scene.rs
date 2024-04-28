@@ -13,7 +13,7 @@ use lyon::{
 use steel::{
     rvals::FromSteelVal,
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal,
+    SteelErr, SteelVal,
 };
 use steel_derive::Steel;
 
@@ -71,10 +71,11 @@ fn draw_circle(radius: f32) -> Path {
 
 pub struct Scene {
     engine: Engine,
+    length: f32,
 }
 
 impl Scene {
-    pub fn new(content: &str) -> Self {
+    pub fn build(content: &str) -> Result<Self, SteelErr> {
         let mut engine = Engine::new();
         // let mut engine = Engine::new_sandboxed();
 
@@ -124,15 +125,14 @@ impl Scene {
             }
         });
 
-        if let Err(err) = engine.run(content) {
-            err.emit_result("foo.scm", include_str!("../scenes/animations.scm"));
-            panic!("{}", err);
-        }
+        engine.run(content);
 
-        Self { engine }
+        let length = engine.extract("length")?;
+
+        Ok(Self { engine, length })
     }
 
-    pub fn render(&mut self, time: Time) -> ObjectTree {
+    pub fn render(&mut self, time: Time) -> Result<ObjectTree, SteelErr> {
         ObjectTree::from_steelval(
             &self
                 .engine
@@ -140,13 +140,11 @@ impl Scene {
                 .map_err(|err| {
                     err.emit_result("foo.scm", include_str!("../scenes/animations.scm"));
                     err
-                })
-                .unwrap(),
+                })?,
         )
-        .unwrap()
     }
 
     pub fn length(&self) -> f32 {
-        self.engine.extract("length").unwrap()
+        self.length
     }
 }

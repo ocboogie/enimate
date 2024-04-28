@@ -1,9 +1,16 @@
 use egui::{pos2, Color32, Pos2, Stroke};
 use lyon::{math::point, path::Path};
 use object::{FillMaterial, Material, Model, Object, ObjectId, StrokeMaterial, Transform};
+use object_tree::ObjectTree;
 use renderer::Renderer;
 use scene::Scene;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    env,
+    fs::read_to_string,
+    sync::{Arc, Mutex},
+};
+use steel::SteelErr;
 
 // mod animation;
 // mod builder;
@@ -28,59 +35,61 @@ mod timing;
 // mod utils;
 // mod world;
 
+struct SceneHandle {
+    scene: Scene,
+    content: String,
+    file_name: String,
+}
+
+impl SceneHandle {
+    fn length(&self) -> f32 {
+        self.scene.length()
+    }
+
+    fn render(&mut self, time: f32) -> Option<ObjectTree> {
+        match self.scene.render(time) {
+            Ok(objects) => Some(objects),
+            Err(err) => {
+                err.emit_result(&self.file_name, &self.content);
+                None
+            }
+        }
+    }
+}
+
 struct App {
-    current_scene: usize,
-    scenes: Vec<(&'static str, Scene)>,
+    scene: Arc<Mutex<SceneHandle>>,
     renderer: Renderer,
     play: bool,
     current_time: f32,
 }
 
-impl App {
-    fn scene(&mut self) -> &mut Scene {
-        &mut self.scenes[self.current_scene].1
-    }
-}
-
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut scene_handle = self.scene.lock().unwrap();
+        let length = scene_handle.length();
+
         let dt = ctx.input(|i| i.stable_dt) as f32;
 
-        if self.play && self.current_time < self.scene().length() {
+        if self.play && self.current_time < length {
             self.current_time += dt;
         }
 
-        if self.current_time >= self.scene().length() {
+        if self.current_time >= length {
             self.play = false;
-            self.current_time = self.scene().length();
+            self.current_time = length;
         }
 
         ctx.request_repaint();
 
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            if self.current_time >= self.scene().length() {
+            if self.current_time >= length {
                 self.current_time = 0.0;
                 self.play = true;
             } else {
                 self.play = !self.play;
             }
         }
-
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::ComboBox::from_label("Scene")
-                .selected_text(format!("{}", self.scenes[self.current_scene].0))
-                .show_ui(ui, |ui| {
-                    for (i, (name, _)) in self.scenes.iter().enumerate() {
-                        if ui
-                            .selectable_value(&mut self.current_scene, i, *name)
-                            .clicked()
-                        {
-                            self.current_time = 0.0;
-                            self.play = true;
-                        }
-                    }
-                });
-        });
 
         // egui::SidePanel::left("scene_panel").show(ctx, |ui| {
         //     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -105,7 +114,7 @@ impl eframe::App for App {
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                let length = self.scene().length();
+                let length = length;
 
                 ui.add(
                     egui::Slider::new(&mut self.current_time, 0.0..=length).clamp_to_range(true),
@@ -125,13 +134,14 @@ impl eframe::App for App {
 
                     let current_time = self.current_time;
                     let size = rect.size();
-                    let objects = self.scene().render(current_time);
+
+                    if let Some(objects) = scene_handle.render(current_time) {
+                        self.renderer.paint_at(ui, rect, objects);
+                    }
                     // let objects = self.scene().render(current_time, (size.x, size.y), input);
                     // let objects = self.scene().render(current_time, (size.x, size.y), input);
 
                     // let boxes = objects.bounding_boxes();
-
-                    self.renderer.paint_at(ui, rect, objects);
 
                     // if false {
                     //     let bb_canvas = ui.painter_at(rect);
@@ -150,12 +160,29 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scenes: Vec<(&'static str, Scene)>) -> Self {
+    fn build_scene(file_name: String) -> Option<SceneHandle> {
+        let content = read_to_string(file_name.clone()).unwrap();
+
+        let scene = Scene::build(&content)
+            .map_err(|err| {
+                err.emit_result(&file_name, &content);
+            })
+            .ok()?;
+
+        Some(SceneHandle {
+            scene,
+            content,
+            file_name,
+        })
+    }
+
+    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scene_file_name: String) -> Self {
         let renderer = Renderer::new(cc).unwrap();
 
+        let scene = Self::build_scene(scene_file_name).unwrap();
+
         Self {
-            current_scene: scenes.len() - 1,
-            scenes,
+            scene: Arc::new(Mutex::new(scene)),
             renderer,
             play: true,
             current_time: 0.0,
@@ -164,6 +191,8 @@ impl App {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().collect();
+
     tracing_subscriber::fmt::init();
 
     let mut native_options = eframe::NativeOptions::default();
@@ -172,39 +201,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     eframe::run_native(
         "My egui App",
         native_options,
-        Box::new(|cc| {
-            Box::new(App::new(
-                cc,
-                vec![
-                    ("circle", Scene::new(include_str!("../scenes/circle.scm"))),
-                    (
-                        "moving_circle",
-                        Scene::new(include_str!("../scenes/moving_circle.scm")),
-                    ),
-                    (
-                        "components",
-                        Scene::new(include_str!("../scenes/components.scm")),
-                    ),
-                    ("motions", Scene::new(include_str!("../scenes/motions.scm"))),
-                    (
-                        "animations",
-                        Scene::new(include_str!("../scenes/animations.scm")),
-                    ),
-                    // // ("Mouse input", mouse_input()),
-                    // ("Stroke", stroke()),
-                    // // ("Building", building()),
-                    // ("Animations", animations()),
-                    // ("Movement", movement()),
-                    // // ("Variables", variables()),
-                    // ("Scenes", embedded_scenes()),
-                    // ("Dynamic Alignment", dynamic_alignment()),
-                    // ("Render Grid", render_grid()),
-                    // ("Grid", grid()),
-                    // ("Typst", typst_example()),
-                    // ("Dynamic path", dynamic_line()),
-                ],
-            ))
-        }),
+        Box::new(move |cc| Box::new(App::new(cc, args[1].clone()))),
     )?;
 
     Ok(())
