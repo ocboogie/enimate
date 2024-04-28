@@ -1,4 +1,5 @@
 use crate::mesh::{Mesh, Vertex};
+use crate::object::Color;
 use crate::object_tree::{ObjectTree, RenderObject, RenderObjectKind};
 use eframe::wgpu::ColorTargetState;
 use eframe::{
@@ -242,10 +243,10 @@ struct MaterialGpu {
     color: Rgba,
 }
 
-impl From<Color32> for MaterialGpu {
-    fn from(color: Color32) -> Self {
+impl From<Color> for MaterialGpu {
+    fn from(color: Color) -> Self {
         Self {
-            color: Rgba::from(color),
+            color: Rgba::from(*color),
         }
     }
 }

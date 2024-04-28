@@ -1,9 +1,8 @@
 use crate::{
     mesh::{Mesh, Vertex},
-    object::{Object, ObjectId, ObjectKind, Transform},
-    utils::box2d_to_rect,
+    object::{Color, Object, ObjectId, ObjectKind, Transform},
 };
-use egui::{pos2, Color32, Rect};
+use egui::{pos2, Rect};
 use lyon::{
     algorithms::aabb::bounding_box,
     lyon_tessellation::{
@@ -16,8 +15,9 @@ use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
 };
+use steel_derive::Steel;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Steel)]
 pub struct ObjectTree {
     pub root: ObjectId,
     objects: HashMap<ObjectId, Object>,
@@ -47,7 +47,7 @@ pub enum RenderObjectKind {
 pub struct RenderObject {
     pub id: ObjectId,
     pub mesh: Mesh,
-    pub color: Color32,
+    pub color: Color,
     pub transform: Transform,
     pub kind: RenderObjectKind,
     pub mesh_revision: usize,
@@ -71,6 +71,16 @@ impl ObjectTree {
             objects,
             parent_map: HashMap::new(),
         }
+    }
+
+    pub fn from_objects(objects: Vec<Object>) -> Self {
+        let mut object_tree = Self::new();
+
+        for (i, object) in objects.into_iter().enumerate() {
+            object_tree.add(i + 1, object, true);
+        }
+
+        object_tree
     }
 
     fn tessellate_fill(tessellator: &mut FillTessellator, path: &Path) -> Mesh {
@@ -264,27 +274,27 @@ impl ObjectTree {
             })
     }
 
-    fn bounding_box_with_transform(&self, object: &Object, transform: Transform) -> Rect {
-        let transform = transform.and_then(&object.transform);
-
-        match &object.object_kind {
-            ObjectKind::Model(model) => {
-                transform.map_aabb(box2d_to_rect(bounding_box(model.path())))
-            }
-            ObjectKind::Group(group) => {
-                let mut bounding_box = Rect::NOTHING;
-
-                for child_id in group {
-                    let child = self.objects.get(child_id).unwrap();
-                    let child_bounding_box = self.bounding_box_with_transform(child, transform);
-
-                    bounding_box = bounding_box.union(child_bounding_box);
-                }
-
-                bounding_box
-            }
-        }
-    }
+    // fn bounding_box_with_transform(&self, object: &Object, transform: Transform) -> Rect {
+    //     let transform = transform.and_then(&object.transform);
+    //
+    //     match &object.object_kind {
+    //         ObjectKind::Model(model) => {
+    //             transform.map_aabb(box2d_to_rect(bounding_box(model.path())))
+    //         }
+    //         ObjectKind::Group(group) => {
+    //             let mut bounding_box = Rect::NOTHING;
+    //
+    //             for child_id in group {
+    //                 let child = self.objects.get(child_id).unwrap();
+    //                 let child_bounding_box = self.bounding_box_with_transform(child, transform);
+    //
+    //                 bounding_box = bounding_box.union(child_bounding_box);
+    //             }
+    //
+    //             bounding_box
+    //         }
+    //     }
+    // }
 
     // pub fn bounding_box(&self, id: ObjectId) -> Box2D {
     //     let transform = self.flattened_transform(id);
@@ -292,49 +302,49 @@ impl ObjectTree {
     //     self.bounding_box_with_transform(object, transform)
     // }
 
-    /// This is the bounding box of the object in its local coordinate system.
-    /// i.e., the bounding box without any of its parents' transforms applied.
-    pub fn local_bounding_box(&self, id: ObjectId) -> Rect {
-        let object = self.objects.get(&id).unwrap();
-        self.local_bounding_box_obj(object)
-    }
+    // /// This is the bounding box of the object in its local coordinate system.
+    // /// i.e., the bounding box without any of its parents' transforms applied.
+    // pub fn local_bounding_box(&self, id: ObjectId) -> Rect {
+    //     let object = self.objects.get(&id).unwrap();
+    //     self.local_bounding_box_obj(object)
+    // }
 
-    pub fn local_bounding_box_obj(&self, object: &Object) -> Rect {
-        self.bounding_box_with_transform(object, Transform::default())
-    }
+    // pub fn local_bounding_box_obj(&self, object: &Object) -> Rect {
+    //     self.bounding_box_with_transform(object, Transform::default())
+    // }
 
-    pub fn bounding_boxes_dp(
-        &self,
-        id: ObjectId,
-        transform: Transform,
-        boxes: &mut HashMap<ObjectId, Rect>,
-    ) -> Rect {
-        let object = self.objects.get(&id).unwrap();
-        let transform = transform.and_then(&object.transform);
+    // pub fn bounding_boxes_dp(
+    //     &self,
+    //     id: ObjectId,
+    //     transform: Transform,
+    //     boxes: &mut HashMap<ObjectId, Rect>,
+    // ) -> Rect {
+    //     let object = self.objects.get(&id).unwrap();
+    //     let transform = transform.and_then(&object.transform);
+    //
+    //     let bb = match &object.object_kind {
+    //         ObjectKind::Model(model) => {
+    //             transform.map_aabb(box2d_to_rect(bounding_box(model.path())))
+    //         }
+    //         ObjectKind::Group(group) => {
+    //             let mut bounding_box = Rect::NOTHING;
+    //
+    //             for child in group {
+    //                 let child_bounding_box = self.bounding_boxes_dp(*child, transform, boxes);
+    //                 bounding_box = bounding_box.union(child_bounding_box);
+    //             }
+    //
+    //             bounding_box
+    //         }
+    //     };
+    //
+    //     boxes.insert(id, bb);
+    //     bb
+    // }
 
-        let bb = match &object.object_kind {
-            ObjectKind::Model(model) => {
-                transform.map_aabb(box2d_to_rect(bounding_box(model.path())))
-            }
-            ObjectKind::Group(group) => {
-                let mut bounding_box = Rect::NOTHING;
-
-                for child in group {
-                    let child_bounding_box = self.bounding_boxes_dp(*child, transform, boxes);
-                    bounding_box = bounding_box.union(child_bounding_box);
-                }
-
-                bounding_box
-            }
-        };
-
-        boxes.insert(id, bb);
-        bb
-    }
-
-    pub fn bounding_boxes(&self) -> HashMap<ObjectId, Rect> {
-        let mut boxes = HashMap::new();
-        self.bounding_boxes_dp(self.root, Transform::default(), &mut boxes);
-        boxes
-    }
+    // pub fn bounding_boxes(&self) -> HashMap<ObjectId, Rect> {
+    //     let mut boxes = HashMap::new();
+    //     self.bounding_boxes_dp(self.root, Transform::default(), &mut boxes);
+    //     boxes
+    // }
 }

@@ -1,82 +1,152 @@
 use crate::{
-    animation::Animation,
-    builder::Builder,
-    dynamics::{DynamicObject, OwnedDynamic},
-    motion::{AddObject, Alpha, Motion},
-    object::{Object, ObjectId},
+    object::{
+        Color, FillMaterial, Material, Model, Object, ObjectKind, Path, StrokeMaterial, Transform,
+    },
     object_tree::ObjectTree,
-    timing::{Sequence, Time},
-    world::{Variable, World},
+    timing::Time,
 };
-use std::collections::HashMap;
+use egui::pos2;
+use lyon::{
+    geom::point,
+    path::{Path as LyonPath, Winding},
+};
+use steel::{
+    rvals::FromSteelVal,
+    steel_vm::{engine::Engine, register_fn::RegisterFn},
+    SteelVal,
+};
+use steel_derive::Steel;
 
-pub struct Scene(pub Sequence);
+// #[derive(Clone, Debug, Steel)]
+// struct Component {
+//     builder: SteelVal,
+//     props: Vec<SteelVal>,
+//     transform: Transform,
+// }
+
+// impl Component {
+//     fn new(builder: SteelVal, props: Vec<SteelVal>, transform: Transform) -> Self {
+//         Self {
+//             builder,
+//             props,
+//             transform,
+//         }
+//     }
+// }
+
+// #[derive(Clone, Debug, Steel)]
+// struct ComponentTree(Vec<Component>);
+//
+// impl ComponentTree {
+//     fn new() -> Self {
+//         ComponentTree(Vec::new())
+//     }
+//
+//     fn add(&mut self, component: Component) {
+//         self.0.push(component);
+//     }
+//
+//     fn build(&self, engine: &mut Engine) -> ObjectTree {
+//         let mut tree = ObjectTree::new();
+//
+//         for component in &self.0 {
+//             let object = Object::from_steelval(
+//                 &engine
+//                     .call_function_with_args(component.builder.clone(), component.props.clone())
+//                     .unwrap(),
+//             )
+//             .unwrap();
+//         }
+//
+//         tree
+//     }
+// }
+
+fn draw_circle(radius: f32) -> Path {
+    let mut path_builder = LyonPath::builder();
+    path_builder.add_circle(point(0.0, 0.0), radius, Winding::Positive);
+
+    path_builder.build().into()
+}
+
+pub struct Scene {
+    engine: Engine,
+}
 
 impl Scene {
-    pub fn null() -> Self {
-        Self(Sequence(vec![]))
-    }
+    pub fn new(content: &str) -> Self {
+        let mut engine = Engine::new();
+        // let mut engine = Engine::new_sandboxed();
 
-    pub fn length(&self) -> Time {
-        self.0.duration()
-    }
-
-    pub fn time_to_alpha(&self, time: Time) -> Alpha {
-        time / self.length()
-    }
-
-    pub fn render_at(&self, time: Time, render_size: (f32, f32)) -> ObjectTree {
-        let mut world = World::new(ObjectTree::new(), render_size, HashMap::new());
-
-        self.0.animate(&mut world, self.time_to_alpha(time));
-
-        world.objects
-    }
-
-    pub fn render_with_input(
-        &mut self,
-        time: f32,
-        render_size: (f32, f32),
-        input: HashMap<Variable, f32>,
-    ) -> ObjectTree {
-        let mut world = World::new(ObjectTree::new(), render_size, input);
-
-        self.0.animate(&mut world, self.time_to_alpha(time));
-
-        world.objects
-    }
-}
-
-pub struct SceneBuilder {
-    scene: Scene,
-}
-
-impl SceneBuilder {
-    pub fn new() -> Self {
-        Self {
-            scene: Scene::null(),
-        }
-    }
-
-    pub fn finish(self) -> Scene {
-        self.scene
-    }
-}
-
-impl Builder for SceneBuilder {
-    fn play<A: Animation + 'static>(&mut self, animation: A) {
-        (self.scene.0).0.push(Box::new(animation));
-    }
-
-    fn add_object(&mut self, object: DynamicObject) -> ObjectId {
-        let object_id = rand::random::<ObjectId>();
-
-        self.play(AddObject {
-            object_id,
-            object: OwnedDynamic::new(object),
-            rooted: true,
+        engine.register_fn("draw-circle", draw_circle);
+        engine.register_fn("model", Model::new);
+        engine.register_fn("fill", |color: Color, model: Model| {
+            // FIXME: We don't want this method to have side effects
+            //        so we clone, but that clones the path which is expensive
+            let mut new = model.clone();
+            new.material.fill = Some(FillMaterial::new(color));
+            new
+        });
+        engine.register_fn("stroke", |width: f32, color: Color, model: Model| {
+            let mut new = model.clone();
+            new.material.stroke = Some(StrokeMaterial::new(color, width));
+            new
+        });
+        engine.register_fn(
+            "object-model",
+            |path: Path, fill: Option<Color>, stroke: Option<StrokeMaterial>| Object {
+                object_kind: ObjectKind::Model(Model::new(
+                    path,
+                    Material {
+                        fill: fill.map(Into::into),
+                        stroke,
+                    },
+                )),
+                transform: Transform::default(),
+            },
+        );
+        engine.register_fn("object-group", Object::new_group);
+        engine.register_fn("color", Color::new);
+        engine.register_fn("object-tree", ObjectTree::from_objects);
+        engine.register_fn("translate", |x: f32, y: f32, object: Object| {
+            let mut new = object.clone();
+            new.transform = new.transform.translate(pos2(x, y));
+            new
+        });
+        engine.register_fn("transform-translate", |x: f32, y: f32| Transform {
+            position: pos2(x, y),
+            ..Default::default()
+        });
+        engine.register_fn("apply-transform", |object: Object, transform: Transform| {
+            Object {
+                object_kind: object.object_kind,
+                transform: object.transform.and_then(&transform),
+            }
         });
 
-        object_id
+        if let Err(err) = engine.run(content) {
+            err.emit_result("foo.scm", include_str!("../scenes/animations.scm"));
+            panic!("{}", err);
+        }
+
+        Self { engine }
+    }
+
+    pub fn render(&mut self, time: Time) -> ObjectTree {
+        ObjectTree::from_steelval(
+            &self
+                .engine
+                .call_function_by_name_with_args("main", vec![time.into()])
+                .map_err(|err| {
+                    err.emit_result("foo.scm", include_str!("../scenes/animations.scm"));
+                    err
+                })
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    pub fn length(&self) -> f32 {
+        self.engine.extract("length").unwrap()
     }
 }

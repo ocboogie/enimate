@@ -1,32 +1,95 @@
+// TODO: Too much abstraction for no reason e.g.,
+// Object -> ObjectKind::Model -> Model -> Material -> StrokeMaterial
+// when really all you need for a object model is path, transform, fill color,
+// stroke color, stroke width.
+use std::ops::{Deref, DerefMut};
+
 use egui::{pos2, Color32, Pos2, Rect};
-use lyon::path::Path;
+use lyon::path::Path as LyonPath;
+use steel_derive::Steel;
 
-use crate::dynamics::Dynamic;
+#[derive(Clone, Debug, Steel)]
+pub struct Path(pub LyonPath);
 
-#[derive(Clone, Debug)]
+impl Deref for Path {
+    type Target = LyonPath;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Path {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<LyonPath> for Path {
+    fn from(path: LyonPath) -> Self {
+        Self(path)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Steel)]
+pub struct Color(pub Color32);
+
+impl Deref for Color {
+    type Target = Color32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Color {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<Color32> for Color {
+    fn from(color: Color32) -> Self {
+        Self(color)
+    }
+}
+
+impl Color {
+    pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self(Color32::from_rgba_premultiplied(r, g, b, a))
+    }
+}
+
+#[derive(Clone, Debug, Steel)]
 pub struct FillMaterial {
-    pub color: Color32,
+    pub color: Color,
+}
+
+impl From<Color> for FillMaterial {
+    fn from(color: Color) -> Self {
+        FillMaterial { color }
+    }
 }
 
 impl FillMaterial {
-    pub fn new(color: Color32) -> Self {
+    pub fn new(color: Color) -> Self {
         Self { color }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Steel)]
 pub struct StrokeMaterial {
-    pub color: Color32,
+    pub color: Color,
     pub width: f32,
 }
 
 impl StrokeMaterial {
-    pub fn new(color: Color32, width: f32) -> Self {
+    pub fn new(color: Color, width: f32) -> Self {
         Self { color, width }
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Steel)]
 pub struct Material {
     pub fill: Option<FillMaterial>,
     pub stroke: Option<StrokeMaterial>,
@@ -51,7 +114,7 @@ impl From<StrokeMaterial> for Material {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, Steel, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Transform {
     pub position: Pos2,
     pub rotation: f32,
@@ -150,11 +213,17 @@ impl Transform {
         new.anchor = anchor;
         new
     }
+
+    pub fn translate(&self, translation: Pos2) -> Self {
+        let mut new = self.clone();
+        new.position += translation.to_vec2();
+        new
+    }
 }
 
 // TODO: At some point, we don't want Model to actually store the mesh, but rather a reference to
 // it.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Steel)]
 pub struct Model {
     path: Path,
     pub material: Material,
@@ -197,20 +266,16 @@ pub enum ObjectKind {
     Group(Vec<ObjectId>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Steel)]
 pub struct Object {
     pub object_kind: ObjectKind,
     pub transform: Transform,
 }
 
 impl Object {
-    pub fn new_model(path: Path, material: Material) -> Self {
+    pub fn new_model(model: Model) -> Self {
         Self {
-            object_kind: ObjectKind::Model(Model {
-                path,
-                material,
-                path_revision: 0,
-            }),
+            object_kind: ObjectKind::Model(model),
             transform: Transform::default(),
         }
     }
