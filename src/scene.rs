@@ -124,8 +124,34 @@ impl Scene {
                 transform: object.transform.and_then(&transform),
             }
         });
+        engine.register_fn("transform-pos-x", |transform: Transform| {
+            transform.position.x
+        });
+        engine.register_fn("transform-pos-y", |transform: Transform| {
+            transform.position.y
+        });
+        engine.register_fn("transform-rot", |transform: Transform| transform.rotation);
+        engine.register_fn("transform-scale", |transform: Transform| transform.scale);
+        engine.register_fn("transform-anchor-x", |transform: Transform| {
+            transform.anchor.x
+        });
+        engine.register_fn("transform-anchor-y", |transform: Transform| {
+            transform.anchor.y
+        });
+        engine.register_fn(
+            "transform",
+            |pos_x: f32, pos_y: f32, rot: f32, scale: f32, anchor_x: f32, anchor_y: f32| {
+                Transform {
+                    position: pos2(pos_x, pos_y),
+                    rotation: rot,
+                    scale,
+                    anchor: pos2(anchor_x, anchor_y),
+                }
+            },
+        );
+        engine.register_fn("id", || rand::random::<usize>());
 
-        engine.run(content);
+        engine.run(content)?;
 
         let length = engine.extract("length")?;
 

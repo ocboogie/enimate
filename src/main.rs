@@ -1,5 +1,7 @@
+use crossbeam::channel::{unbounded, Receiver};
 use egui::{pos2, Color32, Pos2, Stroke};
-use lyon::{math::point, path::Path};
+use lyon::math::point;
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use object::{FillMaterial, Material, Model, Object, ObjectId, StrokeMaterial, Transform};
 use object_tree::ObjectTree;
 use renderer::Renderer;
@@ -8,7 +10,9 @@ use std::{
     collections::HashMap,
     env,
     fs::read_to_string,
-    sync::{Arc, Mutex},
+    path::{Path, PathBuf},
+    str::FromStr,
+    thread,
 };
 use steel::SteelErr;
 
@@ -58,7 +62,10 @@ impl SceneHandle {
 }
 
 struct App {
-    scene: Arc<Mutex<SceneHandle>>,
+    scene: Scene,
+    scene_path: String,
+    rx: Receiver<notify::Result<Event>>,
+
     renderer: Renderer,
     play: bool,
     current_time: f32,
@@ -66,8 +73,18 @@ struct App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut scene_handle = self.scene.lock().unwrap();
-        let length = scene_handle.length();
+        let length = self.scene.length();
+
+        for event in self.rx.try_iter() {
+            dbg!(&event);
+            match event {
+                Ok(_) => {
+                    dbg!();
+                    self.scene = Self::build_scene(&self.scene_path).unwrap();
+                }
+                Err(error) => panic!("Error: {error:?}"),
+            }
+        }
 
         let dt = ctx.input(|i| i.stable_dt) as f32;
 
@@ -135,7 +152,7 @@ impl eframe::App for App {
                     let current_time = self.current_time;
                     let size = rect.size();
 
-                    if let Some(objects) = scene_handle.render(current_time) {
+                    if let Ok(objects) = self.scene.render(current_time) {
                         self.renderer.paint_at(ui, rect, objects);
                     }
                     // let objects = self.scene().render(current_time, (size.x, size.y), input);
@@ -160,29 +177,45 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn build_scene(file_name: String) -> Option<SceneHandle> {
-        let content = read_to_string(file_name.clone()).unwrap();
+    fn build_scene(file_name: &str) -> Option<Scene> {
+        let content = read_to_string(file_name).unwrap();
 
         let scene = Scene::build(&content)
             .map_err(|err| {
-                err.emit_result(&file_name, &content);
+                err.emit_result(file_name, &content);
             })
             .ok()?;
 
-        Some(SceneHandle {
-            scene,
-            content,
-            file_name,
-        })
+        Some(scene)
     }
 
-    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scene_file_name: String) -> Self {
+    fn start_watcher(scene_file_name: String) -> Receiver<notify::Result<Event>> {
+        let (tx, rx) = unbounded();
+
+        thread::spawn(move || {
+            let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
+
+            watcher
+                .watch(Path::new(&scene_file_name), RecursiveMode::Recursive)
+                .unwrap();
+
+            loop {}
+        });
+
+        rx
+    }
+
+    fn new<'a>(cc: &'a eframe::CreationContext<'a>, scene_path: String) -> Self {
         let renderer = Renderer::new(cc).unwrap();
 
-        let scene = Self::build_scene(scene_file_name).unwrap();
+        let scene = Self::build_scene(&scene_path).unwrap();
+
+        let rx = Self::start_watcher(scene_path.clone());
 
         Self {
-            scene: Arc::new(Mutex::new(scene)),
+            scene,
+            scene_path,
+            rx,
             renderer,
             play: true,
             current_time: 0.0,
