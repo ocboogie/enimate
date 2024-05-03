@@ -76,10 +76,8 @@ impl eframe::App for App {
         let length = self.scene.length();
 
         for event in self.rx.try_iter() {
-            dbg!(&event);
             match event {
                 Ok(_) => {
-                    dbg!();
                     self.scene = Self::build_scene(&self.scene_path).unwrap();
                 }
                 Err(error) => panic!("Error: {error:?}"),
