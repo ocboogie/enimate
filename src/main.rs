@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     env,
     fs::read_to_string,
+    hash::Hash,
     path::{Path, PathBuf},
     str::FromStr,
     thread,
@@ -64,6 +65,8 @@ impl SceneHandle {
 struct App {
     scene: Scene,
     scene_path: String,
+    scene_content: String,
+    errored: bool,
     rx: Receiver<notify::Result<Event>>,
 
     renderer: Renderer,
@@ -78,7 +81,19 @@ impl eframe::App for App {
         for event in self.rx.try_iter() {
             match event {
                 Ok(_) => {
-                    self.scene = Self::build_scene(&self.scene_path).unwrap();
+                    self.scene_content = read_to_string(&self.scene_path).unwrap();
+
+                    match Scene::build(&self.scene_content) {
+                        Ok(scene) => {
+                            self.scene = scene;
+                            self.current_time = 0.0;
+                            self.play = true;
+                            self.errored = false;
+                        }
+                        Err(err) => {
+                            err.emit_result(&self.scene_path, &self.scene_content);
+                        }
+                    }
                 }
                 Err(error) => panic!("Error: {error:?}"),
             }
@@ -150,8 +165,18 @@ impl eframe::App for App {
                     let current_time = self.current_time;
                     let size = rect.size();
 
-                    if let Ok(objects) = self.scene.render(current_time) {
-                        self.renderer.paint_at(ui, rect, objects);
+                    if self.errored {
+                        return;
+                    }
+
+                    match self.scene.render(current_time) {
+                        Ok(objects) => {
+                            self.renderer.paint_at(ui, rect, objects);
+                        }
+                        Err(err) => {
+                            err.emit_result(&self.scene_path, &self.scene_content);
+                            self.errored = true;
+                        }
                     }
                     // let objects = self.scene().render(current_time, (size.x, size.y), input);
                     // let objects = self.scene().render(current_time, (size.x, size.y), input);
@@ -175,18 +200,6 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn build_scene(file_name: &str) -> Option<Scene> {
-        let content = read_to_string(file_name).unwrap();
-
-        let scene = Scene::build(&content)
-            .map_err(|err| {
-                err.emit_result(file_name, &content);
-            })
-            .ok()?;
-
-        Some(scene)
-    }
-
     fn start_watcher(scene_file_name: String) -> Receiver<notify::Result<Event>> {
         let (tx, rx) = unbounded();
 
@@ -206,13 +219,21 @@ impl App {
     fn new<'a>(cc: &'a eframe::CreationContext<'a>, scene_path: String) -> Self {
         let renderer = Renderer::new(cc).unwrap();
 
-        let scene = Self::build_scene(&scene_path).unwrap();
+        let content = read_to_string(&scene_path).unwrap();
+        let scene = Scene::build(&content)
+            .map_err(|e| {
+                e.emit_result(&scene_path, &content);
+                e
+            })
+            .unwrap();
 
         let rx = Self::start_watcher(scene_path.clone());
 
         Self {
             scene,
             scene_path,
+            scene_content: content,
+            errored: false,
             rx,
             renderer,
             play: true,

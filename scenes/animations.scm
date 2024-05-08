@@ -92,14 +92,23 @@
          (component (lambda (r fill stroke)
                       (object-model (draw-circle r) fill stroke))
                     (list r fill stroke)
-                    (transform-translate x y)
+                    (translation x y)
+                    (id)))
+
+(define (line x1 y1 x2 y2 stroke)
+         (component (lambda (x1 y1 x2 y2 stroke)
+                      (object-model (draw-line x1 y1 x2 y2) '() stroke))
+                    (list x1 y1 x2 y2 stroke)
+                    (transform-identity)
                     (id)))
 
 (define c1 (circle -2.0 0.0 1.0 (color 255 0 0 255) '()))
 (define c2 (circle 0.0 0.0 1.0 (color 0 255 0 255) '()))
+(define line (line -2.0 0.0 2.0 0.0 (stroke 0.1 (color 0 0 255 255))))
 
 (define scene (seq (list (add c2)
                          (add c1)
+                         (add line)
                          (anim 0.5 (move c1 2.0 -1.0))
                          (anim 0.5 (move c1 0.0 2.0)))))
 

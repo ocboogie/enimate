@@ -69,6 +69,15 @@ fn draw_circle(radius: f32) -> Path {
     path_builder.build().into()
 }
 
+fn draw_line(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -> Path {
+    let mut path_builder = LyonPath::builder();
+    path_builder.begin(point(start_x, start_y));
+    path_builder.line_to(point(end_x, end_y));
+    path_builder.end(false);
+
+    path_builder.build().into()
+}
+
 pub struct Scene {
     engine: Engine,
     length: f32,
@@ -80,18 +89,10 @@ impl Scene {
         // let mut engine = Engine::new_sandboxed();
 
         engine.register_fn("draw-circle", draw_circle);
+        engine.register_fn("draw-line", draw_line);
         engine.register_fn("model", Model::new);
-        engine.register_fn("fill", |color: Color, model: Model| {
-            // FIXME: We don't want this method to have side effects
-            //        so we clone, but that clones the path which is expensive
-            let mut new = model.clone();
-            new.material.fill = Some(FillMaterial::new(color));
-            new
-        });
-        engine.register_fn("stroke", |width: f32, color: Color, model: Model| {
-            let mut new = model.clone();
-            new.material.stroke = Some(StrokeMaterial::new(color, width));
-            new
+        engine.register_fn("stroke", |width: f32, color: Color| {
+            StrokeMaterial::new(color, width)
         });
         engine.register_fn(
             "object-model",
@@ -109,12 +110,21 @@ impl Scene {
         engine.register_fn("object-group", Object::new_group);
         engine.register_fn("color", Color::new);
         engine.register_fn("object-tree", ObjectTree::from_objects);
+        engine.register_fn("object-tree-empty", ObjectTree::new);
+        engine.register_fn(
+            "object-tree-add",
+            |mut tree: ObjectTree, object: Object, rooted: bool| {
+                let id = rand::random::<usize>();
+                tree.add(id, object, rooted);
+                (id, tree)
+            },
+        );
         engine.register_fn("translate", |x: f32, y: f32, object: Object| {
             let mut new = object.clone();
             new.transform = new.transform.translate(pos2(x, y));
             new
         });
-        engine.register_fn("transform-translate", |x: f32, y: f32| Transform {
+        engine.register_fn("translation", |x: f32, y: f32| Transform {
             position: pos2(x, y),
             ..Default::default()
         });
@@ -149,6 +159,7 @@ impl Scene {
                 }
             },
         );
+        engine.register_fn("transform-identity", Transform::default);
         engine.register_fn("id", || rand::random::<usize>());
 
         engine.run(content)?;
@@ -162,11 +173,7 @@ impl Scene {
         ObjectTree::from_steelval(
             &self
                 .engine
-                .call_function_by_name_with_args("main", vec![time.into()])
-                .map_err(|err| {
-                    err.emit_result("foo.scm", include_str!("../scenes/animations.scm"));
-                    err
-                })?,
+                .call_function_by_name_with_args("main", vec![time.into()])?,
         )
     }
 

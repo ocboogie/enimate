@@ -280,10 +280,10 @@ impl Object {
         }
     }
 
-    pub fn new_group(group: Vec<ObjectId>) -> Self {
+    pub fn new_group(group: Vec<ObjectId>, transform: Transform) -> Self {
         Self {
             object_kind: ObjectKind::Group(group),
-            transform: Transform::default(),
+            transform,
         }
     }
 
