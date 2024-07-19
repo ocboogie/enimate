@@ -73,8 +73,8 @@
              (list r fill stroke)
              (transform-translate x y)))
 
-(define c1 (circle -1.0 0.0 1.0 (color 255 0 0 255) '()))
-(define c2 (circle 1.0 0.0 1.0 (color 0 255 0 255) '()))
+(define c1 (circle -1.0 0.0 1.0 (color 255 0 0 255) #f))
+(define c2 (circle 1.0 0.0 1.0 (color 0 255 0 255) #f))
 
 (define scene (list c1 c2))
 

@@ -1,6 +1,7 @@
 use crate::mesh::{Mesh, Vertex};
 use crate::object::Color;
 use crate::object_tree::{ObjectTree, RenderObject, RenderObjectKind};
+use eframe::egui_wgpu::ScreenDescriptor;
 use eframe::wgpu::ColorTargetState;
 use eframe::{
     egui_wgpu::{self, wgpu},
@@ -118,10 +119,12 @@ impl Renderer {
                 module: &shader,
                 entry_point: "vs_main",
                 buffers: &[Vertex::desc()],
+                compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_main",
+                compilation_options: Default::default(),
                 targets: &(if let Some(targets) = custom_targets {
                     [Some(targets)]
                 } else {
@@ -184,6 +187,7 @@ impl egui_wgpu::CallbackTrait for RendererCallback {
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        _screen_descriptor: &ScreenDescriptor,
         _egui_encoder: &mut wgpu::CommandEncoder,
         cb_resources: &mut egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {

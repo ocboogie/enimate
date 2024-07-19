@@ -162,7 +162,8 @@ impl Scene {
         engine.register_fn("transform-identity", Transform::default);
         engine.register_fn("id", || rand::random::<usize>());
 
-        engine.run(content)?;
+        engine.run(content.to_string())?;
+ 
 
         let length = engine.extract("length")?;
 

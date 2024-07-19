@@ -120,7 +120,7 @@
 
 (define (line x1 y1 x2 y2 stroke)
   (component (lambda (x1 y1 x2 y2 stroke)
-               (object-model (draw-line x1 y1 x2 y2) '() stroke))
+               (object-model (draw-line x1 y1 x2 y2) #f stroke))
              (list x1 y1 x2 y2 stroke)
              (transform-identity)
              (id)))
@@ -147,8 +147,8 @@
           (grid-vertical x y w h n stroke))
     (transform-identity)))
 
-(define c1 (circle -2.0 0.0 1.0 (color 255 0 0 255) '()))
-(define c2 (circle 0.0 0.0 1.0 (color 0 255 0 255) '()))
+(define c1 (circle -2.0 0.0 1.0 (color 255 0 0 255) #f))
+(define c2 (circle 0.0 0.0 1.0 (color 0 255 0 255) #f))
 (define new-line (line -2.0 0.0 2.0 0.0 (stroke 0.1 (color 0 0 255 255))))
 (define my-grid (grid -2.0 -2.0 4.0 4.0 4 (stroke 0.1 (color 0 255 255 255))))
 

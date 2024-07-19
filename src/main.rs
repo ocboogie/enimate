@@ -144,8 +144,6 @@ impl eframe::App for App {
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                let length = length;
-
                 ui.add(
                     egui::Slider::new(&mut self.current_time, 0.0..=length).clamp_to_range(true),
                 );
@@ -253,7 +251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     eframe::run_native(
         "My egui App",
         native_options,
-        Box::new(move |cc| Box::new(App::new(cc, args[1].clone()))),
+        Box::new(move |cc| Ok(Box::new(App::new(cc, args[1].clone())))),
     )?;
 
     Ok(())
