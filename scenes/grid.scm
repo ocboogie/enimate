@@ -23,13 +23,17 @@
     [else 
       (error "update-component-transform: not a component" component)]))
 
-; (define (build-object component)
-;   (if (component? component)
-;     (let* ((builder (component-builder component))
-;            (props (component-props component))
-;            (obj (apply builder props)))
-;       (apply-transform obj (component-transform component)))
-;     (error "build-object: not a component" component)))
+ (define (build component)
+   (if (component? component)
+     (let* ((builder (component-builder component))
+            (props (component-props component))
+            (objs (apply builder props)))
+       (if (list? objs) 
+         (map (lambda (child)
+              (apply-transform child (component-transform component)))
+            objs)
+         (apply-transform objs (component-transform component))))
+     (error "build not a component" component)))
 
 ; Doesn't check if props or transform are equal
 (define (component-equal? a b)
@@ -126,26 +130,32 @@
              (id)))
 
 (define (grid-horiz x y w h n stroke)
-  (let ((step (/ w (- n 1))))
-    (component-group
-      (map (lambda (i)
-             (line (+ x (* i step)) y (+ x (* i step)) (+ y h) stroke))
-           (range 0 n))
-      (transform-identity))))
+  (component (lambda (x y w h n stroke)
+               (let ((step (/ w (- n 1))))
+                 (map (lambda (i)
+                        (build (line (+ x (* i step)) y (+ x (* i step)) (+ y h) stroke)))
+                      (range 0 n))))
+             (list x y w h n stroke)
+             (transform-identity)
+             (id)))
 
 (define (grid-vertical x y w h n stroke)
-  (let ((step (/ h (- n 1))))
-    (component-group
-      (map (lambda (i)
-             (line x (+ y (* i step)) (+ x w) (+ y (* i step)) stroke))
-           (range 0 n))
-      (transform-identity))))
+  (component (lambda (x y w h n stroke)
+               (let ((step (/ w (- n 1))))
+                 (map (lambda (i)
+                        (build (line x (+ y (* i step)) (+ x w) (+ y (* i step)) stroke)))
+                      (range 0 n))))
+             (list x y w h n stroke)
+             (transform-identity)
+             (id)))
 
 (define (grid x y w h n stroke)
-  (component-group
-    (list (grid-horiz x y w h n stroke)
-          (grid-vertical x y w h n stroke))
-    (transform-identity)))
+  (component (lambda (x y w h n stroke)
+               (append (build (grid-horiz x y w h n stroke))
+                       (build (grid-vertical x y w h n stroke))))
+             (list x y w h n stroke)
+             (transform-identity)
+             (id)))
 
 (define c1 (circle -2.0 0.0 1.0 (color 255 0 0 255) #f))
 (define c2 (circle 0.0 0.0 1.0 (color 0 255 0 255) #f))
@@ -165,42 +175,17 @@
       (motion components alpha))
     (animation components alpha)))
 
-(define (build-children children object-tree)
-  (fold (lambda (child result) 
-          (let* ((children (car result))
-                 (object-tree (cadr result))
-                 (new-result (build-and-add-object child #f object-tree))
-                 (child-id (car new-result))
-                 (object-tree (cadr new-result)))
-            (cons (cons child-id children) object-tree)))
-        (list '() object-tree)
-        children))
-
-(define (build-and-add-object component rooted object-tree)
-  (cond
-    [(component? component)
-     (let* ((builder (component-builder component))
-            (props (component-props component))
-            (obj (apply builder props))
-            (obj (apply-transform obj (component-transform component))))
-       (object-tree-add object-tree obj rooted))]
-    [(component-group? component)
-     (let* ((children (component-group-children component))
-            (result (build-children children object-tree))
-            (children-objs (car result))
-            (object-tree (cadr result))
-            (group (object-group children-objs (component-group-transform component))))
-       (object-tree-add object-tree group rooted))]
-    [else
-      (error "build-object: not a component" component)]))
+(define (build-aux component)
+  (let ((objs (build component)))
+    (if (list? objs)
+      objs
+      (list objs))))
 
 (define (build-object-tree component-tree)
-  (fold (lambda (component object-tree) 
-          (cadr (build-and-add-object component #t object-tree)))
-        (object-tree-empty)
-        component-tree))
+  (transduce component-tree (flat-mapping build-aux) (into-list)))
 
 (define (main time)
-  (build-object-tree (play scene '() time)))
+  (object-tree
+    (build-object-tree (play scene '() time))))
 
 (define length (dur scene))
