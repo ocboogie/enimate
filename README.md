@@ -13,21 +13,21 @@ similar but with a different goals.
 
 ### Goals
 
-- Flexibility: should have the ability to create nearly any animation you could
+- **Flexibility**: should have the ability to create nearly any animation you could
   imagine, from traditional motion design (like moving text, images, and shapes
   with easing functions, transitions, and transformations) to generative art
   and mathematical animations (like dynamic graphs, fractals, point clouds,
   etc.).
 
-- API: should have an elegantly simple API with powerful abstractions that
+- **API**: should have an elegantly simple API with powerful abstractions that
   allow for complete control over the animation process, while still having
   high-level constructs like a declarative component hierarchy with animatable
   properties.
 
-- Performance: should be able to render complex animations in real-time,
+- **Performance**: should be able to render complex animations in real-time,
   requiring a low-level custom built renderer built on top of [wgpu](https://github.com/gfx-rs/wgpu).
 
-- Seekable: should be able to render any frame in the animation at any time,
+- **Seekable**: should be able to render any frame in the animation at any time,
   without having to render the entire animation from the beginning.
 
 ### Example
