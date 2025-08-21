@@ -24,6 +24,9 @@ similar but with a different goals.
   high-level constructs like a declarative component hierarchy with animatable
   properties.
 
+- Performance: should be able to render complex animations in real-time,
+  requiring a low-level custom built renderer built on top of [wgpu](https://github.com/gfx-rs/wgpu).
+
 - Seekable: should be able to render any frame in the animation at any time,
   without having to render the entire animation from the beginning.
 
@@ -48,5 +51,4 @@ fn component_animations() -> Scene {
 }
 ```
 
-
-https://github.com/user-attachments/assets/397dabf5-cc24-4592-a30a-c19879d94ddf
+<https://github.com/user-attachments/assets/397dabf5-cc24-4592-a30a-c19879d94ddf>
