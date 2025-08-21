@@ -201,6 +201,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ("Dynamic Alignment", dynamic_alignment()),
                     ("Render Grid", render_grid()),
                     ("Grid", grid()),
+                    ("Animating Component Children", animate_component_children()),
                     ("Typst", typst_example()),
                     ("Dynamic path", dynamic_line()),
                 ],
@@ -390,6 +391,39 @@ fn grid() -> Scene {
     b.finish()
 }
 
+fn animate_component_children() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let grid_handle = b.add(Grid {
+        rows: 10,
+        cols: 10,
+        width: 8.0,
+        height: 8.0,
+        material: StrokeMaterial::new(Color32::BLUE, 0.1).into(),
+    });
+
+    let mut c = Concurrently::default();
+
+    c.add(
+        grid_handle
+            .vertical_lines
+            .mv(pos2(0.0, -grid_handle.grid.height), pos2(0.0, 0.0))
+            .with_duration(0.5)
+            .with_easing(Easing::EaseInOut),
+    );
+    c.add(
+        grid_handle
+            .horizontal_lines
+            .mv(pos2(-grid_handle.grid.width, 0.0), pos2(0.0, 0.0))
+            .with_duration(0.5)
+            .with_easing(Easing::EaseInOut),
+    );
+
+    b.play(c);
+
+    b.finish()
+}
+
 struct Grid {
     rows: usize,
     cols: usize,
@@ -426,18 +460,11 @@ impl Component for Grid {
             let x = (i as f32 / self.cols as f32) * self.width - self.width / 2.0;
             let y = -self.height / 2.0;
 
-            vertical_lines.add(Line {
+            let line = vertical_lines.add(Line {
                 start: pos2(x, y),
                 end: pos2(x, y + self.height),
                 material: self.material.clone(),
             });
-
-            // c.add(
-            //     Wait.with_duration(0.1 * i as f32).then(
-            //         line.animate(pos2(x, y), pos2(x, y + self.height))
-            //             .with_duration(1.0),
-            //     ),
-            // );
         }
 
         GridHandle {
