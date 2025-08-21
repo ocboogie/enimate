@@ -16,6 +16,8 @@ use std::collections::HashMap;
 use timing::{Concurrently, Sequence, Wait};
 use typst::Typst;
 
+use crate::renderer::UNIT_GRID_HEIGHT;
+
 mod animation;
 mod builder;
 mod component;
@@ -145,11 +147,12 @@ impl eframe::App for App {
 
                     self.renderer.paint_at(ui, rect, objects);
 
-                    if false {
+                    if true {
                         let bb_canvas = ui.painter_at(rect);
                         for (_id, bb) in boxes {
                             bb_canvas.rect_stroke(
-                                bb.translate(rect.center().to_vec2()),
+                                (bb * (size.y / UNIT_GRID_HEIGHT))
+                                    .translate(rect.center().to_vec2()),
                                 0.0,
                                 Stroke::new(1.0, Color32::RED),
                             );
