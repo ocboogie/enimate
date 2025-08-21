@@ -4,7 +4,7 @@ use egui::Pos2;
 
 use crate::builder::Builder;
 use crate::dynamics::{Dynamic, DynamicTransform, OwnedDynamic};
-use crate::motion::{Move, MoveTo};
+use crate::motion::{FadeIn, Move, MoveTo};
 use crate::object::{Object, ObjectId, Transform};
 
 pub struct Handle<C: Component> {
@@ -113,6 +113,12 @@ impl<C: Component> Handle<C> {
         Move {
             from: OwnedDynamic::new(from),
             to: OwnedDynamic::new(to),
+            object_id: self.object_id,
+        }
+    }
+
+    pub fn fade_in(&self) -> FadeIn {
+        FadeIn {
             object_id: self.object_id,
         }
     }

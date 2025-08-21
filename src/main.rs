@@ -147,7 +147,7 @@ impl eframe::App for App {
 
                     self.renderer.paint_at(ui, rect, objects);
 
-                    if true {
+                    if false {
                         let bb_canvas = ui.painter_at(rect);
                         for (_id, bb) in boxes {
                             bb_canvas.rect_stroke(
@@ -204,6 +204,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ("Animating Component Children", animate_component_children()),
                     ("Typst", typst_example()),
                     ("Dynamic path", dynamic_line()),
+                    ("Component animations", component_animations()),
                 ],
             ))
         }),
@@ -475,6 +476,21 @@ impl Component for Grid {
     }
 }
 
+impl GridHandle {
+    fn fade_in(&self) -> impl Motion {
+        let mut c = Concurrently::default();
+
+        for horizontal_line in &self.horizontal_lines.inner.children {
+            c.add(horizontal_line.fade_in().with_duration(0.0));
+        }
+        for vertical_line in &self.horizontal_lines.inner.children {
+            c.add(vertical_line.fade_in().with_duration(0.0));
+        }
+
+        c
+    }
+}
+
 fn render_grid() -> Scene {
     let mut b = SceneBuilder::new();
 
@@ -520,6 +536,26 @@ fn dynamic_line() -> Scene {
     b.play(
         line.animate(Some(pos2(-1.0, 1.0)), Some(pos2(1.0, -1.0)))
             .with_duration(1.0),
+    );
+
+    b.finish()
+}
+
+fn component_animations() -> Scene {
+    let mut b = SceneBuilder::new();
+
+    let grid = b.add(Grid {
+        rows: 10,
+        cols: 10,
+        width: 8.0,
+        height: 8.0,
+        material: StrokeMaterial::new(Color32::BLUE, 0.1).into(),
+    });
+
+    b.play(
+        grid.fade_in()
+            .with_duration(0.5)
+            .with_easing(Easing::EaseInOut),
     );
 
     b.finish()
