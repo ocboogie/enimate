@@ -14,6 +14,17 @@ pub trait Animation: Motion + 'static {
     {
         Sequence(vec![Box::new(self), Box::new(other)])
     }
+
+    fn with_easing(self, easing: Easing) -> MotionAnimation<Self>
+    where
+        Self: Sized,
+    {
+        MotionAnimation {
+            duration: self.duration(),
+            motion: self,
+            easing,
+        }
+    }
 }
 
 pub struct MotionAnimation<M: Motion> {

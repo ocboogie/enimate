@@ -344,36 +344,22 @@ fn dynamic_alignment() -> Scene {
             radius: 0.5,
             material: FillMaterial::new(Color32::RED).into(),
         }
-        .with_position(pos2(1.0, 1.0)),
+        .with_position(pos2(0.0, 0.0)),
     );
     let left_circle = b.add(
         Circle {
             radius: 0.5,
             material: FillMaterial::new(Color32::BLUE).into(),
         }
-        .with_position(pos2(-1.0, 1.0)),
+        .with_position(pos2(1.0, 1.0)),
     );
 
-    let mut c = Concurrently::default();
-
-    c.add(
-        right_circle
-            .mv(Alignment::new(**right_circle).center(), pos2(1.0, -1.0))
-            .with_duration(1.0)
-            .with_easing(EaseInOut),
-    );
-
-    c.add(
+    b.play(
         left_circle
-            .mv(
-                Alignment::new(**left_circle).center(),
-                Alignment::new(**right_circle).left(),
-            )
+            .mv(pos2(1.0, 1.0), Alignment::new(**right_circle).left())
             .with_duration(1.0)
             .with_easing(EaseInOut),
     );
-
-    b.play(c);
 
     b.finish()
 }
@@ -477,14 +463,22 @@ impl Component for Grid {
 }
 
 impl GridHandle {
-    fn fade_in(&self) -> impl Motion {
+    fn draw_out(&self, duration: f32) -> Concurrently {
         let mut c = Concurrently::default();
 
         for horizontal_line in &self.horizontal_lines.inner.children {
-            c.add(horizontal_line.fade_in().with_duration(0.0));
+            c.add(
+                horizontal_line
+                    .animate(Some(horizontal_line.start), Some(horizontal_line.start))
+                    .with_duration(duration),
+            );
         }
-        for vertical_line in &self.horizontal_lines.inner.children {
-            c.add(vertical_line.fade_in().with_duration(0.0));
+        for vertical_line in &self.vertical_lines.inner.children {
+            c.add(
+                vertical_line
+                    .animate(Some(vertical_line.start), Some(vertical_line.start))
+                    .with_duration(duration),
+            );
         }
 
         c
@@ -512,14 +506,11 @@ fn render_grid() -> Scene {
 fn typst_example() -> Scene {
     let mut b = SceneBuilder::new();
 
-    // b.add(Typst {
-    //     text: r#"$e^(i pi)+1=0$"#.to_string(),
-    //     material: FillMaterial::new(Color32::RED).into(),
-    // });
-    b.add(Typst {
-        text: r#""area" = pi dot "radius"^2"#.to_string(),
-        material: FillMaterial::new(Color32::RED).into(),
+    let text = b.add(Typst {
+        text: r#"$e^(i pi)+1=0$"#.to_string(),
+        material: FillMaterial::new(Color32::WHITE).into(),
     });
+    b.play(text.mv(pos2(0.0, 0.0), pos2(-3.0, -3.0)).with_duration(1.0));
 
     b.finish()
 }
@@ -552,11 +543,7 @@ fn component_animations() -> Scene {
         material: StrokeMaterial::new(Color32::BLUE, 0.1).into(),
     });
 
-    b.play(
-        grid.fade_in()
-            .with_duration(0.5)
-            .with_easing(Easing::EaseInOut),
-    );
+    b.play(grid.draw_out(0.5).with_easing(Easing::EaseInOut));
 
     b.finish()
 }

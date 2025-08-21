@@ -42,9 +42,9 @@ pub struct Line {
 
 #[derive(Clone)]
 pub struct LineHandle {
-    line: Handle<Object>,
-    start: Pos2,
-    end: Pos2,
+    pub line: Handle<Object>,
+    pub start: Pos2,
+    pub end: Pos2,
 }
 
 impl Line {
