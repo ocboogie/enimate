@@ -466,14 +466,14 @@ impl GridHandle {
     fn draw_out(&self, duration: f32) -> Concurrently {
         let mut c = Concurrently::default();
 
-        for horizontal_line in &self.horizontal_lines.inner.children {
+        for horizontal_line in &self.horizontal_lines.children {
             c.add(
                 horizontal_line
                     .animate(Some(horizontal_line.start), Some(horizontal_line.start))
                     .with_duration(duration),
             );
         }
-        for vertical_line in &self.vertical_lines.inner.children {
+        for vertical_line in &self.vertical_lines.children {
             c.add(
                 vertical_line
                     .animate(Some(vertical_line.start), Some(vertical_line.start))
@@ -543,7 +543,8 @@ fn component_animations() -> Scene {
         material: StrokeMaterial::new(Color32::BLUE, 0.1).into(),
     });
 
-    b.play(grid.draw_out(0.5).with_easing(Easing::EaseInOut));
+    b.play(Wait.with_duration(0.5));
+    b.play(grid.draw_out(1.5).with_easing(Easing::EaseInOut));
 
     b.finish()
 }
