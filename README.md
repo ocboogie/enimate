@@ -48,4 +48,5 @@ fn component_animations() -> Scene {
 }
 ```
 
-![Example Animation](assets/example.mp4)
+
+https://github.com/user-attachments/assets/397dabf5-cc24-4592-a30a-c19879d94ddf
