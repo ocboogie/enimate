@@ -9,7 +9,7 @@ The idea of Enimate was inspired by [Manim](https://github.com/3b1b/manim), a
 mathematical animation engine created by
 [3Blue1Brown](https://www.youtube.com/@3blue1brown). Doing motion design as a
 hobby, I was amazed by the power of Manim, so I wanted to create something
-similar but with a different goals.
+similar but with different goals.
 
 ### Goals
 
